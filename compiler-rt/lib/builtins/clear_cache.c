@@ -59,6 +59,17 @@ uintptr_t GetCurrentProcess(void);
 // specified range.
 
 void __clear_cache(void *start, void *end) {
+#ifdef __KVX__
+  const uintptr_t cache_line_size = 64;
+  const uintptr_t mask = ~(cache_line_size - 1);
+  const uintptr_t start_dword = ((uintptr_t)start) & mask;
+  const uintptr_t end_dword = ((uintptr_t)(end + cache_line_size - 1) & mask);
+  __builtin_kvx_fence();
+  for (uintptr_t p = start_dword; p <= end_dword; p += cache_line_size)
+    __builtin_kvx_i1invals((void *)(p));
+  __builtin_kvx_fence();
+  return;
+#endif
 #if defined(_WIN32) &&                                                         \
     (defined(__arm__) || defined(__aarch64__) || defined(__arm64ec__))
   FlushInstructionCache(GetCurrentProcess(), start, end - start);

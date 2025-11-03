@@ -224,6 +224,7 @@ public:
                                         HardwareLoopInfo &HWLoopInfo) const {
     return false;
   }
+  bool shouldAddRemainderMetaData() { return false; }
 
   virtual unsigned getEpilogueVectorizationMinVF() const { return 16; }
 

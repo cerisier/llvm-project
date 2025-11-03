@@ -1,4 +1,4 @@
-// UNSUPPORTED: target={{.*}}-aix{{.*}}
+// UNSUPPORTED: target={{.*}}-aix{{.*}}, target=kvx-{{.*}}
 //
 // RUN: rm -fr %t
 // RUN: mkdir -p %t

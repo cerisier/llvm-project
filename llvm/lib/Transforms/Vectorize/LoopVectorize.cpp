@@ -7096,11 +7096,11 @@ VectorizationFactor LoopVectorizationPlanner::computeBestVF() {
   return BestFactor;
 }
 
-static void addRuntimeUnrollDisableMetaData(Loop *L) {
+static void addMetaDataToRemainderLoops(Loop *L, const StringRef &Str) {
   SmallVector<Metadata *, 4> MDs;
   // Reserve first location for self reference to the LoopID metadata node.
   MDs.push_back(nullptr);
-  bool IsUnrollMetadata = false;
+  bool IsUnrollOrRemainderMetadata = false;
   MDNode *LoopID = L->getLoopID();
   if (LoopID) {
     // First find existing loop unrolling disable metadata.
@@ -7108,19 +7108,21 @@ static void addRuntimeUnrollDisableMetaData(Loop *L) {
       auto *MD = dyn_cast<MDNode>(LoopID->getOperand(I));
       if (MD) {
         const auto *S = dyn_cast<MDString>(MD->getOperand(0));
-        IsUnrollMetadata =
-            S && S->getString().starts_with("llvm.loop.unroll.disable");
+        IsUnrollOrRemainderMetadata =
+            S && S->getString().starts_with(Str);
       }
       MDs.push_back(LoopID->getOperand(I));
     }
   }
 
-  if (!IsUnrollMetadata) {
+  if (!IsUnrollOrRemainderMetadata) {
     // Add runtime unroll disable metadata.
     LLVMContext &Context = L->getHeader()->getContext();
     SmallVector<Metadata *, 1> DisableOperands;
-    DisableOperands.push_back(
-        MDString::get(Context, "llvm.loop.unroll.runtime.disable"));
+    const StringRef &Attribute = (Str.equals("llvm.loop.unroll.disable"))
+                                     ? "llvm.loop.unroll.runtime.disable"
+                                     : Str;
+    DisableOperands.push_back(MDString::get(Context, Attribute));
     MDNode *DisableNode = MDNode::get(Context, DisableOperands);
     MDs.push_back(DisableNode);
     MDNode *NewLoopID = MDNode::get(Context, MDs);
@@ -7137,6 +7139,69 @@ static Value *getStartValueFromReductionResult(VPInstruction *RdxResult) {
   VPValue *StartVPV = RdxResult->getOperand(1);
   match(StartVPV, m_Freeze(m_VPValue(StartVPV)));
   return StartVPV->getLiveInIRValue();
+}
+
+static void AddRuntimeUnrollDisableMetaData(Loop *L) {
+  addMetaDataToRemainderLoops(L, "llvm.loop.unroll.disable");
+}
+static void AddRemainderMetaData(Loop *L) {
+  addMetaDataToRemainderLoops(L, "llvm.loop.remainder");
+}
+
+// Check if \p RedResult is a ComputeReductionResult instruction, and if it is
+// create a merge phi node for it and add it to \p ReductionResumeValues.
+static void createAndCollectMergePhiForReduction(
+    VPInstruction *RedResult,
+    DenseMap<const RecurrenceDescriptor *, Value *> &ReductionResumeValues,
+    VPTransformState &State, Loop *OrigLoop, BasicBlock *LoopMiddleBlock) {
+  if (!RedResult ||
+      RedResult->getOpcode() != VPInstruction::ComputeReductionResult)
+    return;
+
+  auto *PhiR = cast<VPReductionPHIRecipe>(RedResult->getOperand(0));
+  const RecurrenceDescriptor &RdxDesc = PhiR->getRecurrenceDescriptor();
+
+  TrackingVH<Value> ReductionStartValue = RdxDesc.getRecurrenceStartValue();
+  Value *FinalValue =
+      State.get(RedResult, VPIteration(State.UF - 1, VPLane::getFirstLane()));
+  auto *ResumePhi =
+      dyn_cast<PHINode>(PhiR->getStartValue()->getUnderlyingValue());
+
+  // TODO: bc.merge.rdx should not be created here, instead it should be
+  // modeled in VPlan.
+  BasicBlock *LoopScalarPreHeader = OrigLoop->getLoopPreheader();
+  // Create a phi node that merges control-flow from the backedge-taken check
+  // block and the middle block.
+  auto *BCBlockPhi = PHINode::Create(FinalValue->getType(), 2, "bc.merge.rdx",
+                                     LoopScalarPreHeader->getTerminator());
+
+  // If we are fixing reductions in the epilogue loop then we should already
+  // have created a bc.merge.rdx Phi after the main vector body. Ensure that
+  // we carry over the incoming values correctly.
+  for (auto *Incoming : predecessors(LoopScalarPreHeader)) {
+    if (Incoming == LoopMiddleBlock)
+      BCBlockPhi->addIncoming(FinalValue, Incoming);
+    else if (ResumePhi && is_contained(ResumePhi->blocks(), Incoming))
+      BCBlockPhi->addIncoming(ResumePhi->getIncomingValueForBlock(Incoming),
+                              Incoming);
+    else
+      BCBlockPhi->addIncoming(ReductionStartValue, Incoming);
+  }
+
+  auto *OrigPhi = cast<PHINode>(PhiR->getUnderlyingValue());
+  // TODO: This fixup should instead be modeled in VPlan.
+  // Fix the scalar loop reduction variable with the incoming reduction sum
+  // from the vector body and from the backedge value.
+  int IncomingEdgeBlockIdx =
+      OrigPhi->getBasicBlockIndex(OrigLoop->getLoopLatch());
+  assert(IncomingEdgeBlockIdx >= 0 && "Invalid block index");
+  // Pick the other block.
+  int SelfEdgeBlockIdx = (IncomingEdgeBlockIdx ? 0 : 1);
+  OrigPhi->setIncomingValue(SelfEdgeBlockIdx, BCBlockPhi);
+  Instruction *LoopExitInst = RdxDesc.getLoopExitInstr();
+  OrigPhi->setIncomingValue(IncomingEdgeBlockIdx, LoopExitInst);
+
+  ReductionResumeValues[&RdxDesc] = BCBlockPhi;
 }
 
 // If \p EpiResumePhiR is resume VPPhi for a reduction when vectorizing the
@@ -10330,7 +10395,11 @@ bool LoopVectorizePass::processLoop(Loop *L) {
   } else {
     if (DisableRuntimeUnroll)
       addRuntimeUnrollDisableMetaData(L);
-
+    // Only returns true for kvx
+    if (TTI->shouldAddRemainderMetaData()) {
+      // Flag scalar loop to prevent its conversion to a hardware loop
+      AddRemainderMetaData(L);
+    }
     // Mark the loop as already vectorized to avoid vectorizing again.
     Hints.setAlreadyVectorized();
   }
