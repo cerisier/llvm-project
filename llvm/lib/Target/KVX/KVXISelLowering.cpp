@@ -394,8 +394,6 @@ inline static StringRef getMVTName(const MVT &T) {
     return "MVT::Metadata";
   case MVT::iPTR:
     return "MVT::iPTR";
-  case MVT::iPTRAny:
-    return "MVT::iPTRAny";
   case MVT::Untyped:
     return "MVT::Untyped";
   case MVT::funcref:
@@ -2179,7 +2177,8 @@ Instruction *KVXTargetLowering::emitLeadingFence(IRBuilderBase &Builder,
   if (AS == 1) { // __global AS (opencl_global): emit a call to OS intrinsic.
     Module *M = Builder.GetInsertBlock()->getParent()->getParent();
 
-    assert(M->getTargetTriple().find("cos") &&
+    const Triple &TT = M->getTargetTriple();
+    assert(TT.getOSName().contains("cos") &&
            "This codegen is for ClusterOS only");
 
     FunctionCallee Fn = M->getOrInsertFunction(
@@ -2223,7 +2222,8 @@ Instruction *KVXTargetLowering::emitTrailingFence(IRBuilderBase &Builder,
   if (AS == 1) { // __global AS (opencl_global): emit a call to OS intrinsic.
     Module *M = Builder.GetInsertBlock()->getParent()->getParent();
 
-    assert(M->getTargetTriple().find("cos") &&
+    const Triple &TT = M->getTargetTriple();
+    assert(TT.getOSName().contains("cos") &&
            "This codegen is for ClusterOS only");
 
     FunctionCallee Fn = M->getOrInsertFunction(
