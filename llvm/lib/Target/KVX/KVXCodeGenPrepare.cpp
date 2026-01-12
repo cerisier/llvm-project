@@ -22,7 +22,7 @@
 #include "llvm/Transforms/Utils/Local.h"
 
 using namespace llvm;
-using namespace PatternMatch;
+using namespace llvm::PatternMatch;
 
 #define DEBUG_TYPE "kvx-codegen-prepare"
 
@@ -47,7 +47,7 @@ static SmallSet<BasicBlock *, 8> ToDCE;
 // Reverse the instruction-combine that converts icmp(vector_reduce_(and/or))
 // into (icmp(bitcast to iN ()))
 static bool visitICmp(Instruction &I, const bool IsV1) {
-  ICmpInst::Predicate PredCast, PredVec;
+  CmpPredicate PredCast, PredVec;
   Value *LHS, *RHS;
   Instruction *VecIcmp;
   if (match(&I, m_ICmp(PredCast,
@@ -282,13 +282,16 @@ bool visitIntrinsic_vector_reduce_and(CallInst &CI, const bool IsV1) {
 }
 
 bool visitIntrinsic_vector_reduce_or(CallInst &CI, const bool IsV1) {
-  CmpInst::Predicate NE0, NE1, NE2;
+  CmpPredicate NE0, NE1, NE2;
   Value *V0, *V1, *V2;
   if (match(&CI, m_Intrinsic<Intrinsic::vector_reduce_or>(m_Select(
                      m_Select(m_Cmp(NE0, m_Value(V0), m_Zero()), m_One(),
                               m_Cmp(NE1, m_Value(V1), m_Zero())),
                      m_One(), m_Cmp(NE2, m_Value(V2), m_Zero()))))) {
-    if (NE0 == NE1 && NE0 == NE2 && NE0 == CmpInst::ICMP_NE &&
+    CmpInst::Predicate P0 = NE0;
+    CmpInst::Predicate P1 = NE1;
+    CmpInst::Predicate P2 = NE2;
+    if (P0 == P1 && P0 == P2 && P0 == CmpInst::ICMP_NE &&
         V0->getType() == V1->getType() && V0->getType() == V2->getType() &&
         isPowerOf2_32(V0->getType()->getPrimitiveSizeInBits())) {
       auto &Ctx = CI.getContext();

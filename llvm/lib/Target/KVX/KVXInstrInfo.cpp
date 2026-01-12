@@ -14,6 +14,7 @@
 #include "KVXHazardRecognizer.h"
 #include "KVXSubtarget.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/CodeGen/MachineMemOperand.h"
 #include "llvm/CodeGen/RegisterScavenging.h"
 #include "llvm/MC/MCDwarf.h"
 
@@ -31,8 +32,11 @@ KVXInstrInfo::KVXInstrInfo(KVXSubtarget &ST)
 
 void KVXInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
                                MachineBasicBlock::iterator MBBI,
-                               const DebugLoc &DL, MCRegister DstReg,
-                               MCRegister SrcReg, bool KillSrc) const {
+                               const DebugLoc &DL, Register DstReg,
+                               Register SrcReg, bool KillSrc,
+                               bool RenamableDest, bool RenamableSrc) const {
+  (void)RenamableDest;
+  (void)RenamableSrc;
 
   const KVXRegisterInfo *TRI = Subtarget.getRegisterInfo();
 
@@ -324,7 +328,9 @@ void KVXInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
                                         Register DstReg, int FI,
                                         const TargetRegisterClass *RC,
                                         const TargetRegisterInfo *TRI,
-                                        Register VReg) const {
+                                        Register VReg,
+                                        MachineInstr::MIFlag Flags) const {
+  (void)Flags;
   return loadRegFromStackSlot(MBB, I, DstReg, FI, RC, TRI, VReg, false,
                               DebugLoc());
 }
@@ -436,7 +442,9 @@ void KVXInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
                                        Register SrcReg, bool IsKill, int FI,
                                        const TargetRegisterClass *RC,
                                        const TargetRegisterInfo *TRI,
-                                       Register VReg) const {
+                                       Register VReg,
+                                       MachineInstr::MIFlag Flags) const {
+  (void)Flags;
   LLVM_DEBUG(dbgs() << "Storing register (" << SrcReg << ") to the stack.\n");
 
   DebugLoc DL;
@@ -1017,15 +1025,17 @@ static bool hasXSMod(const MachineInstr &MI) {
 
 bool KVXInstrInfo::getMemOperandsWithOffsetWidth(
     const MachineInstr &MI, SmallVectorImpl<const MachineOperand *> &BaseOps,
-    int64_t &Offset, bool &OffsetIsScalable, unsigned &Width,
+    int64_t &Offset, bool &OffsetIsScalable, LocationSize &Width,
     const TargetRegisterInfo *TRI) const {
+  unsigned WidthVal = 0;
 
   unsigned BasePos, OffsetPos;
 
   OffsetIsScalable = hasXSMod(MI);
 
-  if (!getMemWidth(MI, Width))
+  if (!getMemWidth(MI, WidthVal))
     return false;
+  Width = LocationSize::precise(WidthVal);
 
   // Only base register -> offset is 0
   if (hasOnlyBaseMemOp(MI)) {
@@ -1064,21 +1074,22 @@ bool KVXInstrInfo::areMemAccessesTriviallyDisjoint(
   SmallVector<const MachineOperand *, 1> BaseOp1{}, BaseOp2{};
   int64_t Offset1, Offset2;
   bool OffsetIsScalable1, OffsetIsScalable2;
-  unsigned Width1(0), Width2(0);
+  LocationSize Width1 = LocationSize::precise(0);
+  LocationSize Width2 = LocationSize::precise(0);
 
   if (!getMemOperandsWithOffsetWidth(MI1, BaseOp1, Offset1, OffsetIsScalable1,
                                      Width1, nullptr))
     return false;
 
   if (OffsetIsScalable1)
-    Offset1 *= Width1;
+    Offset1 *= Width1.getValue().getKnownMinValue();
 
   if (!getMemOperandsWithOffsetWidth(MI2, BaseOp2, Offset2, OffsetIsScalable2,
                                      Width2, nullptr))
     return false;
 
   if (OffsetIsScalable2)
-    Offset2 *= Width2;
+    Offset2 *= Width2.getValue().getKnownMinValue();
 
   assert(BaseOp1.size() == 1 && BaseOp2.size() == 1 &&
          "More than 1 base operand not supported");
@@ -1089,7 +1100,9 @@ bool KVXInstrInfo::areMemAccessesTriviallyDisjoint(
 
   int64_t LowOffset = std::min(Offset1, Offset2);
   int64_t HighOffset = std::max(Offset1, Offset2);
-  int64_t LowWidth = (LowOffset == Offset1) ? Width1 : Width2;
+  int64_t LowWidth = (LowOffset == Offset1)
+                         ? Width1.getValue().getKnownMinValue()
+                         : Width2.getValue().getKnownMinValue();
 
   return (LowOffset + LowWidth <= HighOffset);
 }
@@ -1427,7 +1440,9 @@ public:
     NewPreheader->splice(II, LoopdoMI->getParent(), LoopdoMI);
   }
 
-  void disposed() override { LoopdoMI->eraseFromParent(); }
+  void disposed(LiveIntervals *LIS = nullptr) override {
+    LoopdoMI->eraseFromParent();
+  }
 };
 
 std::unique_ptr<TargetInstrInfo::PipelinerLoopInfo>

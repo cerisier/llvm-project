@@ -23,7 +23,6 @@ KVXMCAsmInfo::KVXMCAsmInfo(const Triple &TT) {
   Data64bitsDirective = "\t.8byte\t";
   DwarfRegNumForCFI = true;
   ExceptionsType = ExceptionHandling::SjLj;
-  HasBasenameOnlyForFileDirective = false;
   MaxInstLength = 12;
   MinInstAlignment = 4;
   ParseInlineAsmUsingAsmParser = false;

@@ -2645,7 +2645,7 @@ public:
     if (!GetLow)
       Lo = UndefValue::get(OutVT);
     else if (ExtractElement)
-      Lo = CreateExtractElement(V, 0UL, Name);
+      Lo = CreateExtractElement(V, static_cast<uint64_t>(0), Name);
     else {
       SmallVector<int, 16> Mask;
       for (int I = 0; I < OutSize; ++I)
@@ -2657,7 +2657,7 @@ public:
     if (!GetHigh)
       Hi = UndefValue::get(OutVT);
     else if (ExtractElement)
-      Hi = CreateExtractElement(V, 1UL, Name);
+      Hi = CreateExtractElement(V, static_cast<uint64_t>(1), Name);
     else {
       SmallVector<int, 16> Mask;
       for (int I = 0; I < OutSize; ++I)

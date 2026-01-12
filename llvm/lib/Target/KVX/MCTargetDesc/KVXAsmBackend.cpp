@@ -22,8 +22,8 @@ public:
   KVXAsmBackend(const Target &T)
       : MCAsmBackend(llvm::endianness::little), TheTarget(T), Is64Bit(true) {}
 
-  bool mayNeedRelaxation(const MCInst &Inst, const MCSubtargetInfo &STI) const
-      override {
+  bool mayNeedRelaxation(unsigned Opcode, ArrayRef<MCOperand> Operands,
+                         const MCSubtargetInfo &STI) const override {
     // FIXME mayNeedRelaxation() unimplemented
     return false;
   }

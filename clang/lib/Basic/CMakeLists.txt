@@ -55,6 +55,7 @@ if(CLANG_VENDOR)
 endif()
 
 add_clang_library(clangBasic
+  ASTSourceDescriptor.cpp
   Attributes.cpp
   Builtins.cpp
   CLWarnings.cpp
@@ -74,20 +75,23 @@ add_clang_library(clangBasic
   LangStandards.cpp
   MakeSupport.cpp
   Module.cpp
+  NoSanitizeList.cpp
   ObjCRuntime.cpp
+  OffloadArch.cpp
   OpenCLOptions.cpp
   OpenMPKinds.cpp
   OperatorPrecedence.cpp
   ParsedAttrInfo.cpp
   ProfileList.cpp
-  NoSanitizeList.cpp
   SanitizerSpecialCaseList.cpp
   Sanitizers.cpp
   Sarif.cpp
+  SimpleTypoCorrection.cpp
   SourceLocation.cpp
   SourceManager.cpp
   SourceMgrAdapter.cpp
   Stack.cpp
+  StackExhaustionHandler.cpp
   TargetID.cpp
   TargetInfo.cpp
   Targets.cpp
@@ -101,7 +105,6 @@ add_clang_library(clangBasic
   Targets/DirectX.cpp
   Targets/Hexagon.cpp
   Targets/Lanai.cpp
-  Targets/Le64.cpp
   Targets/LoongArch.cpp
   Targets/M68k.cpp
   Targets/MSP430.cpp

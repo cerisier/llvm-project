@@ -16,14 +16,17 @@
 
 #include "KVXSubtarget.h"
 #include "MCTargetDesc/KVXMCTargetDesc.h"
+#include "llvm/CodeGen/CodeGenTargetMachineImpl.h"
 #include "llvm/IR/DataLayout.h"
-#include "llvm/Target/TargetMachine.h"
+#include <optional>
 
 namespace llvm {
 
-class KVXTargetMachine : public LLVMTargetMachine {
+class PassBuilder;
+
+class KVXTargetMachine : public CodeGenTargetMachineImpl {
   std::unique_ptr<TargetLoweringObjectFile> TLOF;
-  mutable StringMap<std::unique_ptr<KVXSubtarget> > SubtargetMap;
+  mutable StringMap<std::unique_ptr<KVXSubtarget>> SubtargetMap;
 
 public:
   KVXTargetMachine(const Target &T, const Triple &TT, StringRef CPU,
@@ -34,6 +37,10 @@ public:
   const KVXSubtarget *getSubtargetImpl(const Function &F) const override;
 
   TargetPassConfig *createPassConfig(PassManagerBase &PM) override;
+  void registerPassBuilderCallbacks(PassBuilder &PB) override;
+  ScheduleDAGInstrs *createMachineScheduler(MachineSchedContext *C) const override;
+  ScheduleDAGInstrs *
+  createPostMachineScheduler(MachineSchedContext *C) const override;
 
   TargetTransformInfo getTargetTransformInfo(const Function &F) const override;
 

@@ -583,13 +583,13 @@ static Type *DecodeFixedType(ArrayRef<Intrinsic::IITDescriptor> &Infos,
   case IITDescriptor::VecOfAnyPtrsToElt:
     // Return the overloaded type (which determines the pointers address space)
     return Tys[D.getOverloadArgNumber()];
-  }
   case IITDescriptor::DoubleVec: {
     Type *Ty = Tys[D.getArgumentNumber()];
     VectorType *VTy = dyn_cast<VectorType>(Ty);
     if (VTy)
       return VectorType::getDoubleElementsVectorType(VTy);
     return VectorType::get(Ty, ElementCount::get(2, false));
+  }
   }
   llvm_unreachable("unhandled");
 }
@@ -929,7 +929,7 @@ matchIntrinsicType(Type *Ty, ArrayRef<Intrinsic::IITDescriptor> &Infos,
       return IsDeferredCheck || DeferCheck(Ty);
 
     Type *NewTy = ArgTys[D.getArgumentNumber()];
-    return Ty != NewTy->getTruncatedType(false)
+    return Ty != NewTy->getTruncatedType(false);
   }
   case IITDescriptor::OneNthEltsVecArgument:
     // If this is a forward reference, defer the check for later.

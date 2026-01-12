@@ -21,6 +21,7 @@
 #include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/CodeGen/TargetPassConfig.h"
+#include "llvm/Passes/PassBuilder.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Target/TargetOptions.h"
@@ -139,14 +140,15 @@ KVXTargetMachine::KVXTargetMachine(const Target &T, const Triple &TT,
                                    std::optional<Reloc::Model> RM,
                                    std::optional<CodeModel::Model> CM,
                                    CodeGenOptLevel OL, bool JIT)
-    : LLVMTargetMachine(T,
-                        "e-S256-p:64:64-i1:8-i8:8-i16:16-i32:32-i64:64-"
-                        "v64:64-v128:128-v256:256-v512:256-v1024:256-"
-                        "f16:16-f32:32-f64:64-a:0:64-m:e-n32:64",
-                        TT, KVX_MC::selectKVXCPU(CPU), FS, Opts,
-                        getEffectiveRelocModel(TT, RM),
-                        getEffectiveCodeModel(CM, CodeModel::Small), OL),
+    : CodeGenTargetMachineImpl(T,
+                               "e-S256-p:64:64-i1:8-i8:8-i16:16-i32:32-i64:64-"
+                               "v64:64-v128:128-v256:256-v512:256-v1024:256-"
+                               "f16:16-f32:32-f64:64-a:0:64-m:e-n32:64",
+                               TT, KVX_MC::selectKVXCPU(CPU), FS, Opts,
+                               getEffectiveRelocModel(TT, RM),
+                               getEffectiveCodeModel(CM, CodeModel::Small), OL),
       TLOF(std::make_unique<KVXELFTargetObjectFile>()) {
+  (void)JIT;
 
   Options.DisableIntegratedAS = true;
   Options.BinutilsVersion = {2, 40};
@@ -166,7 +168,7 @@ public:
   KVXPassConfig(KVXTargetMachine &TM, PassManagerBase &PM)
       : TargetPassConfig(TM, PM) {
     if (!DisableLOOPDO) {
-      disablePass(&EarlyTailDuplicateID);
+      disablePass(&EarlyTailDuplicateLegacyID);
     }
     if (TM.getOptLevel() != CodeGenOptLevel::None)
       disablePass(&PostRASchedulerID);
@@ -176,18 +178,6 @@ public:
     return getTM<KVXTargetMachine>();
   }
 
-  ScheduleDAGInstrs *
-  createMachineScheduler(MachineSchedContext *C) const override {
-    ScheduleDAGMILive *DAG = createGenericSchedLive(C);
-    DAG->addMutation(createKVXLoadLatencyMutation());
-    // TODO - These two mutations require to implement shouldClusterMemOps()
-    // DAG->addMutation(createLoadClusterDAGMutation(DAG->TII, DAG->TRI));
-    // DAG->addMutation(createStoreClusterDAGMutation(DAG->TII, DAG->TRI));
-    return DAG;
-  }
-
-  ScheduleDAGInstrs *
-  createPostMachineScheduler(MachineSchedContext *C) const override;
   void addIRPasses() override;
   bool addInstSelector() override;
   void addPreRegAlloc() override;
@@ -224,9 +214,19 @@ TargetPassConfig *KVXTargetMachine::createPassConfig(PassManagerBase &PM) {
   return new KVXPassConfig(*this, PM);
 }
 
+void KVXTargetMachine::registerPassBuilderCallbacks(PassBuilder &PB) {
+  (void)PB;
+}
+
 ScheduleDAGInstrs *
-KVXPassConfig::createPostMachineScheduler(MachineSchedContext *C) const {
-  // Disable bundling at -O0 and -O1
+KVXTargetMachine::createMachineScheduler(MachineSchedContext *C) const {
+  auto *DAG = createSchedLive(C);
+  DAG->addMutation(createKVXLoadLatencyMutation());
+  return DAG;
+}
+
+ScheduleDAGInstrs *
+KVXTargetMachine::createPostMachineScheduler(MachineSchedContext *C) const {
   bool DisableBundling = SwitchOldBundling || ForceDisableBundling ||
                          getOptLevel() <= CodeGenOptLevel::Less;
   if (DisableBundling)
@@ -238,7 +238,7 @@ KVXPassConfig::createPostMachineScheduler(MachineSchedContext *C) const {
 }
 
 void KVXPassConfig::addIRPasses() {
-  addPass(createAtomicExpandPass());
+  addPass(createAtomicExpandLegacyPass());
   if (getOptLevel() >= CodeGenOptLevel::Less) {
     addPass(createDeadCodeEliminationPass());
     if (getOptLevel() >= CodeGenOptLevel::Default) {
@@ -306,7 +306,7 @@ bool KVXPassConfig::addPreISel() {
 
 TargetTransformInfo
 KVXTargetMachine::getTargetTransformInfo(const Function &F) const {
-  return TargetTransformInfo(KVXTTIImpl(this, F));
+  return TargetTransformInfo(std::make_unique<KVXTTIImpl>(this, F));
 }
 
 bool KVXTargetMachine::isNoopAddrSpaceCast(unsigned SrcAS,

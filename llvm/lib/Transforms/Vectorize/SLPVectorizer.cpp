@@ -13817,6 +13817,7 @@ BoUpSLP::getEntryCost(const TreeEntry *E, ArrayRef<Value *> VectorizedVals,
                                           TTI::CastContextHint::None, CostKind);
         VecCost +=
             TTIRef.getCastInstrCost(E->getAltOpcode(), VecTy, SrcTy,
+                                    TTI::CastContextHint::None, CostKind);
         //NOTE(cerisier): Can't resolve conflict...
         // Type *Src0SclTy = E->getMainOp()->getOperand(0)->getType();
         // Type *Src1SclTy = E->getAltOp()->getOperand(0)->getType();

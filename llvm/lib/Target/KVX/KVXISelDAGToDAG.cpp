@@ -14,6 +14,8 @@
 #include "KVX.h"
 #include "KVXTargetMachine.h"
 #include "llvm/CodeGen/SelectionDAGISel.h"
+#include "llvm/InitializePasses.h"
+#include <memory>
 
 using namespace llvm;
 
@@ -23,17 +25,12 @@ namespace {
 
 class KVXDAGToDAGISel final : public SelectionDAGISel {
 
-  const KVXSubtarget *Subtarget;
+  const KVXSubtarget *Subtarget = nullptr;
 
 public:
-  static char ID;
   explicit KVXDAGToDAGISel(KVXTargetMachine &TargetMachine,
                   CodeGenOptLevel OptLevel)
-      : SelectionDAGISel(ID, TargetMachine, OptLevel), Subtarget(nullptr) {}
-
-  StringRef getPassName() const override {
-    return "KVX DAG->DAG Pattern Instruction Selection";
-  }
+      : SelectionDAGISel(TargetMachine, OptLevel) {}
 
   bool runOnMachineFunction(MachineFunction &MF) override {
     Subtarget = &MF.getSubtarget<KVXSubtarget>();
@@ -53,9 +50,23 @@ public:
 #include "KVXGenDAGISel.inc"
 };
 
+class KVXDAGToDAGISelLegacy : public SelectionDAGISelLegacy {
+public:
+  static char ID;
+  KVXDAGToDAGISelLegacy(KVXTargetMachine &TM, CodeGenOptLevel OptLevel)
+      : SelectionDAGISelLegacy(
+            ID, std::make_unique<KVXDAGToDAGISel>(TM, OptLevel)) {}
+};
 
 } // namespace
-char KVXDAGToDAGISel::ID = 0;
+
+namespace llvm {
+void initializeKVXDAGToDAGISelLegacyPass(PassRegistry &);
+}
+
+char KVXDAGToDAGISelLegacy::ID = 0;
+INITIALIZE_PASS(KVXDAGToDAGISelLegacy, DEBUG_TYPE,
+                "KVX DAG->DAG Pattern Instruction Selection", false, false)
 
 bool KVXDAGToDAGISel::selectAddrFI(SDValue Addr, SDValue &Base) {
   if (auto *FIN = dyn_cast<FrameIndexSDNode>(Addr)) {
@@ -183,8 +194,9 @@ MachineSDNode *KVXDAGToDAGISel::buildMake(SDLoc &DL, SDNode *Imm,
   return MakeInsn;
 }
 
-FunctionPass *llvm::createKVXISelDag(KVXTargetMachine &TM, CodeGenOptLevel OptLevel) {
-  return new KVXDAGToDAGISel(TM, OptLevel);
+FunctionPass *llvm::createKVXISelDag(KVXTargetMachine &TM,
+                                     CodeGenOptLevel OptLevel) {
+  return new KVXDAGToDAGISelLegacy(TM, OptLevel);
 }
 
 bool KVXDAGToDAGISel::SelectInlineAsmMemoryOperand(const SDValue &Op,

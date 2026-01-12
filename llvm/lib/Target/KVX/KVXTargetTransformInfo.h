@@ -23,6 +23,7 @@
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/CodeGen/BasicTTIImpl.h"
 #include "llvm/CodeGen/TargetLowering.h"
+#include <algorithm>
 
 namespace llvm {
 
@@ -37,6 +38,7 @@ class KVXTTIImpl : public BasicTTIImplBase<KVXTTIImpl> {
   const KVXTargetLowering *TLI;
   const KVXSubtarget *getST() const { return ST; }
   const KVXTargetLowering *getTLI() const { return TLI; }
+  using BaseT::preferInLoopReduction;
 
 public:
   explicit KVXTTIImpl(const KVXTargetMachine *TM, const Function &F)
@@ -45,50 +47,55 @@ public:
 
   void getUnrollingPreferences(Loop *L, ScalarEvolution &SE,
                                TTI::UnrollingPreferences &UP,
-                               OptimizationRemarkEmitter *ORE);
+                               OptimizationRemarkEmitter *ORE) const override;
 
   bool isHardwareLoopProfitable(Loop *L, ScalarEvolution &SE,
                                 AssumptionCache &AC, TargetLibraryInfo *LibInfo,
-                                HardwareLoopInfo &HWLoopInfo);
-  bool shouldAddRemainderMetaData();
-  bool isLoweredToCall(const Function *F);
-  bool isLoweredToCall(const CallInst &CI);
+                                HardwareLoopInfo &HWLoopInfo) const override;
+  bool shouldAddRemainderMetaData() const override;
+  bool isLoweredToCall(const Function *F) const override;
+  bool isLoweredToCall(const CallInst &CI) const;
   bool isLSRCostLess(const TargetTransformInfo::LSRCost &C1,
-                     const TargetTransformInfo::LSRCost &C2) const;
-  unsigned getInliningThresholdMultiplier() const;
+                     const TargetTransformInfo::LSRCost &C2) const override;
+  unsigned getInliningThresholdMultiplier() const override;
 
   TargetTransformInfo::PopcntSupportKind
-  getPopcntSupport(unsigned IntTyWidthInBit) const;
+  getPopcntSupport(unsigned IntTyWidthInBit) const override;
 
-  bool shouldExpandReduction(const IntrinsicInst *II) const;
+  bool shouldExpandReduction(const IntrinsicInst *II) const override;
 
   bool preferInLoopReduction(unsigned Opcode, Type *Ty,
                              TTI::ReductionFlags Flags) const;
 
   InstructionCost getArithmeticReductionCost(
       unsigned Opcode, VectorType *Ty, std::optional<FastMathFlags> FMF,
-      TTI::TargetCostKind CostKind = TTI::TCK_RecipThroughput);
+      TTI::TargetCostKind CostKind = TTI::TCK_RecipThroughput) const override;
 
-  bool
-  shouldMaximizeVectorBandwidth(TargetTransformInfo::RegisterKind K) const {
+  bool shouldMaximizeVectorBandwidth(
+      TargetTransformInfo::RegisterKind K) const override {
     return true;
   };
-  bool enableAggressiveInterleaving(bool LoopHasReductions) const {
+  bool enableAggressiveInterleaving(bool LoopHasReductions) const override {
     return !ST->isV1();
   }
 
-  bool enableInterleavedAccessVectorization() const { return !ST->isV1(); }
-
-  unsigned getNumberOfRegisters(unsigned ClassID) const;
-  TypeSize getRegisterBitWidth(bool Vector) const {
-    return TypeSize::getFixed(Vector ? 256 : 64);
+  bool enableInterleavedAccessVectorization() const override {
+    return !ST->isV1();
   }
 
-  const char *getRegisterClassName(unsigned ClassID) const;
+  bool isVectorShiftByScalarCheap(Type *Ty) const override { return true; }
 
-  unsigned getRegisterClassForType(bool Vector, Type *Ty) const;
+  unsigned getNumberOfRegisters(unsigned ClassID) const override;
+  TypeSize
+  getRegisterBitWidth(TargetTransformInfo::RegisterKind K) const override {
+    return TypeSize::getFixed(K == TargetTransformInfo::RGK_Scalar ? 64 : 256);
+  }
 
-  unsigned getMaxInterleaveFactor(ElementCount VF) const {
+  const char *getRegisterClassName(unsigned ClassID) const override;
+
+  unsigned getRegisterClassForType(bool Vector, Type *Ty) const override;
+
+  unsigned getMaxInterleaveFactor(ElementCount VF) const override {
     // FIXME: Workaround for VPPlan + InsCombine bugs.
     // Enforcing interleave when no vectorization is done (VF = 1)
     // generates a useless runtime test for this code, for
@@ -118,68 +125,74 @@ public:
     return std::max(1u, 8u / VF.getKnownMinValue());
   }
 
-  unsigned getRegUsageForType(Type *Ty) const {
+  unsigned getRegUsageForType(Type *Ty) const override {
     if (!Ty->isSized())
       return 0;
 
-    return std::max(1ul, Ty->getPrimitiveSizeInBits() / 64);
+    unsigned Parts = static_cast<unsigned>(Ty->getPrimitiveSizeInBits() / 64);
+    return std::max(1u, Parts);
   }
 
-  InstructionCost getVectorInstrCost(unsigned Opcode, Type *Val,
-                                     TTI::TargetCostKind CostKind,
-                                     unsigned Index = -1, Value *Op0 = nullptr,
-                                     Value *Op1 = nullptr) const;
+  InstructionCost
+  getVectorInstrCost(unsigned Opcode, Type *Val,
+                     TTI::TargetCostKind CostKind, unsigned Index = -1,
+                     const Value *Op0 = nullptr,
+                     const Value *Op1 = nullptr) const override;
 
   InstructionCost getVectorInstrCost(const Instruction &I, Type *Val,
                                      TTI::TargetCostKind CostKind,
-                                     unsigned Index = -1) {
-  return getVectorInstrCost(I.getOpcode(), Val, CostKind, Index);
-}
-
+                                     unsigned Index = -1) const override {
+    return getVectorInstrCost(I.getOpcode(), Val, CostKind, Index);
+  }
 
   InstructionCost getScalarizationOverhead(VectorType *Ty,
                                            const APInt &DemandedElts,
                                            bool Insert, bool Extract,
-                                           TTI::TargetCostKind CostKind);
+                                           TTI::TargetCostKind CostKind,
+                                           bool ForPoisonSrc = true,
+                                           ArrayRef<Value *> VL = {}) const override;
 
-  bool isTypeLegal(Type *Ty) const;
+  bool isTypeLegal(Type *Ty) const override;
 
   InstructionCost getArithmeticInstrCost(
       unsigned Opcode, Type *Ty, TTI::TargetCostKind CostKind,
       TTI::OperandValueInfo Op1Info = {TTI::OK_AnyValue, TTI::OP_None},
       TTI::OperandValueInfo Op2Info = {TTI::OK_AnyValue, TTI::OP_None},
       ArrayRef<const Value *> Args = ArrayRef<const Value *>(),
-      const Instruction *CxtI = nullptr);
+      const Instruction *CxtI = nullptr) const override;
 
 
   InstructionCost getIntrinsicInstrCost(const IntrinsicCostAttributes &ICA,
-                                        TTI::TargetCostKind CostKind);
+                                        TTI::TargetCostKind CostKind) const override;
 
   InstructionCost getExtractWithExtendCost(unsigned Opcode, Type *Dst,
-                                           VectorType *VecTy,
-                                           unsigned Index = -1);
+                                           VectorType *VecTy, unsigned Index = -1,
+                                           TTI::TargetCostKind CostKind =
+                                               TTI::TCK_SizeAndLatency) const override;
   InstructionCost
   getCastInstrCost(unsigned Opcode, Type *Dst, Type *Src,
                    TTI::CastContextHint CCH,
                    TTI::TargetCostKind CostKind = TTI::TCK_SizeAndLatency,
-                   const Instruction *I = nullptr);
+                   const Instruction *I = nullptr) const override;
 
-  InstructionCost getCmpSelInstrCost(unsigned Opcode, Type *ValTy, Type *CondTy,
-                                     CmpInst::Predicate VecPred,
-                                     TTI::TargetCostKind CostKind,
-                                     const Instruction *I = nullptr);
+  InstructionCost getCmpSelInstrCost(
+      unsigned Opcode, Type *ValTy, Type *CondTy, CmpInst::Predicate VecPred,
+      TTI::TargetCostKind CostKind,
+      TTI::OperandValueInfo Op1Info = {TTI::OK_AnyValue, TTI::OP_None},
+      TTI::OperandValueInfo Op2Info = {TTI::OK_AnyValue, TTI::OP_None},
+      const Instruction *I = nullptr) const override;
 
   InstructionCost getMinMaxReductionCost(Intrinsic::ID IID, VectorType *Ty,
                                          FastMathFlags FMF,
-                                         TTI::TargetCostKind CostKind);
+                                         TTI::TargetCostKind CostKind) const override;
 
   InstructionCost getCFInstrCost(unsigned Opcode, TTI::TargetCostKind CostKind,
-                                 const Instruction *I = nullptr);
+                                 const Instruction *I = nullptr) const override;
 
-  unsigned getNumberOfParts(Type *Tp);
+  unsigned getNumberOfParts(Type *Tp) const override;
 
 private:
-  bool isHardwareLoopProfitableCheck(Loop *L, ScalarEvolution &SE);
+  bool isHardwareLoopProfitableCheck(Loop *L, ScalarEvolution &SE) const;
 };
 
 } // end namespace llvm

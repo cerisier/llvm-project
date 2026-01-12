@@ -463,12 +463,13 @@ bool SjLjEHPrepareImpl::setupEntryBlockAndCallSites(Function &F) {
   for (BasicBlock &BB : F) {
     if (&BB == &F.front())
       continue;
-    for (Instruction &I : BB)
+    for (Instruction &I : BB) {
       if (!isa<InvokeInst>(I) && I.mayThrow())
         insertCallSiteStore(&I, -1);
-      //NOTE(cerisier): Not sure what to do else....
+      // NOTE(cerisier): Not sure what to do else....
       if (I.mayThrow() && !InvokesSet.count(&I))
         insertCallSiteStore(&I, -1);
+    }
   }
 
   // Following any allocas not in the entry block, update the saved SP in the

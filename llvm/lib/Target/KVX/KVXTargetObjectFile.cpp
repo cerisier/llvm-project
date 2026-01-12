@@ -8,6 +8,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "KVXTargetObjectFile.h"
+#include "MCTargetDesc/KVXAsmInfo.h"
 #include "llvm/Target/TargetMachine.h"
 
 using namespace llvm;
@@ -20,5 +21,5 @@ void KVXELFTargetObjectFile::Initialize(MCContext &Ctx,
 
 const MCExpr *
 KVXELFTargetObjectFile::getDebugThreadLocalSymbol(const MCSymbol *Sym) const {
-  return MCSymbolRefExpr::create(Sym, KVX::S_KVX_TLSLE, getContext());
+  return MCSymbolRefExpr::create(Sym, KVX::S_TLSLE, getContext());
 }

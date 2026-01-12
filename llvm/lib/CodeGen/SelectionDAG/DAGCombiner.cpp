@@ -25479,7 +25479,7 @@ static SDValue narrowInsertExtractVectorBinOp(EVT SubVT, SDValue BinOp,
 
   // If the extract operation is free and the wider vector is legal
   // then we don't split the binop.
-  if (TLI.isOpFree(Extract) &&
+  if (TLI.isExtractSubvectorCheap(SubVT, VecVT, Index) &&
       TLI.isOperationLegalOrCustom(BinOpcode, VecVT, LegalOperations))
     return SDValue();
 

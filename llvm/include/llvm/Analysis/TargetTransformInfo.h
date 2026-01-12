@@ -217,6 +217,8 @@ class TargetTransformInfoImplBase;
 /// This pass provides access to the codegen interfaces that are needed
 /// for IR-level transformations.
 class TargetTransformInfo {
+  class Concept;
+  template <typename T> class Model;
 public:
   enum PartialReductionExtendKind { PR_None, PR_SignExtend, PR_ZeroExtend };
 
@@ -1842,6 +1844,8 @@ public:
   /// into a shuffle sequence.
   LLVM_ABI bool shouldExpandReduction(const IntrinsicInst *II) const;
 
+  struct ReductionFlags {};
+
   enum struct ReductionShuffle { SplitHalf, Pairwise };
 
   /// \returns The shuffle sequence pattern used to expand the given reduction
@@ -3069,10 +3073,6 @@ public:
     return Impl.getMaxNumArgs();
   }
 };
-
-template <typename T>
-TargetTransformInfo::TargetTransformInfo(T Impl)
-    : TTIImpl(new Model<T>(Impl)) {}
 
 /// Analysis pass providing the \c TargetTransformInfo.
 ///

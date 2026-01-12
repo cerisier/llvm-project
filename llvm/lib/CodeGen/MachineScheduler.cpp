@@ -769,7 +769,6 @@ static bool isSchedBoundary(MachineBasicBlock::iterator MI,
                             MachineBasicBlock *MBB,
                             MachineFunction *MF,
                             const TargetInstrInfo *TII, bool IsPostRA) {
-                            const TargetInstrInfo *TII) {
   bool IsBoundary = IsPostRA ? TII->isSchedulingBoundaryPostRA(*MI, MBB, *MF)
                              : TII->isSchedulingBoundary(*MI, MBB, *MF);
   return MI->isCall() || IsBoundary || MI->isFakeUse();

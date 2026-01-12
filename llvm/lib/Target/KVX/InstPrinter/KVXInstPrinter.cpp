@@ -38,7 +38,7 @@ void KVXInstPrinter::printInst(const MCInst *MI, uint64_t Address,
   return printInstruction(MI, Address, O);
 }
 
-void KVXInstPrinter::printRegName(raw_ostream &OS, MCRegister Reg) const {
+void KVXInstPrinter::printRegName(raw_ostream &OS, MCRegister Reg) {
   OS << getRegisterName(Reg);
 }
 
@@ -80,7 +80,7 @@ void KVXInstPrinter::printOperand(
   if (!MO.isExpr())
     report_fatal_error("Unknown operand kind in printOperand");
 
-  MO.getExpr()->print(O, &MAI);
+  MAI.printExpr(O, *MO.getExpr());
 }
 
 void KVXInstPrinter::printVariantMod(

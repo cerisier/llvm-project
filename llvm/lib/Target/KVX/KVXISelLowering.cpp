@@ -22,6 +22,7 @@
 #include "llvm/CodeGen/MachineJumpTableInfo.h"
 #include "llvm/CodeGen/MachineModuleInfo.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Module.h"
 #include "llvm/IR/IntrinsicsKVX.h"
 #include "llvm/Support/Alignment.h"
 #include "llvm/Support/KnownBits.h"
@@ -483,10 +484,10 @@ KVXTargetLowering::KVXTargetLowering(const TargetMachine &TM,
                    ISD::UREM})
       setOperationAction(I, VT, LibCall);
 
-  setLibcallName(RTLIB::SDIVREM_I32, "__divmodsi4");
-  setLibcallName(RTLIB::UDIVREM_I32, "__udivmodsi4");
-  setLibcallName(RTLIB::SDIVREM_I64, "__divmoddi4");
-  setLibcallName(RTLIB::SDIVREM_I64, "__udivmoddi4");
+  setLibcallImpl(RTLIB::SDIVREM_I32, RTLIB::__divmodsi4);
+  setLibcallImpl(RTLIB::UDIVREM_I32, RTLIB::__udivmodsi4);
+  setLibcallImpl(RTLIB::SDIVREM_I64, RTLIB::__divmoddi4);
+  setLibcallImpl(RTLIB::UDIVREM_I64, RTLIB::__udivmoddi4);
 
   setOperationAction(ISD::MULHU, MVT::v4i16, Custom);
   setOperationAction(ISD::MULHS, MVT::v4i16, Custom);
@@ -991,7 +992,7 @@ KVXTargetLowering::KVXTargetLowering(const TargetMachine &TM,
                  ISD::ZERO_EXTEND})
     setTargetDAGCombine(I);
 
-  setLibcallName(RTLIB::UNWIND_RESUME, "_Unwind_SjLj_Resume");
+  setLibcallImpl(RTLIB::UNWIND_RESUME, RTLIB::_Unwind_SjLj_Resume);
 }
 
 EVT KVXTargetLowering::getSetCCResultType(const DataLayout &DL, LLVMContext &C,
@@ -1221,7 +1222,8 @@ unsigned KVXTargetLowering::getVectorTypeBreakdownForCallingConv(
 
 bool KVXTargetLowering::CanLowerReturn(
     CallingConv::ID CallConv, MachineFunction &MF, bool IsVarArg,
-    const SmallVectorImpl<ISD::OutputArg> &Outs, LLVMContext &Context) const {
+    const SmallVectorImpl<ISD::OutputArg> &Outs, LLVMContext &Context,
+    const Type * /*RetTy*/) const {
   SmallVector<CCValAssign, 16> RVLocs;
   CCState CCInfo(CallConv, IsVarArg, MF, RVLocs, Context);
   return CCInfo.CheckReturn(Outs, RetCC_KVX);
@@ -4495,14 +4497,14 @@ bool KVXTargetLowering::shouldReplaceBy(SDNode *From, unsigned ToOpcode,
       return true;
 
     // Move to shifts before loads, stores and returns
-    switch (From->use_begin()->getOpcode()) {
+    switch (From->use_begin()->getNode()->getOpcode()) {
     case ISD::LOAD:
     case ISD::STORE:
     case ISD::CopyToReg: // Used before returns
       return true;
     case ISD::ADD:
       // A madd adding/subtractin an immediate needs a make
-      auto User = From->use_begin();
+      SDNode *User = From->use_begin()->getNode();
       if (isa<ConstantSDNode>(User->getOperand(1)))
         return true;
     }
@@ -4630,7 +4632,7 @@ SDValue KVXTargetLowering::LowerINTRINSIC(SDValue Op, SelectionDAG &DAG,
     MachineFunction &MF = DAG.getMachineFunction();
     const TargetLowering &TLI = DAG.getTargetLoweringInfo();
     MVT PtrVT = TLI.getPointerTy(DAG.getDataLayout());
-    auto &Context = MF.getMMI().getContext();
+    auto &Context = DAG.getMMI()->getContext();
     // Our lsda symbol name must match the (hard-coded) one that
     // will be emmited by EHStreamer::emitExceptionTable()
     MCSymbol *S = Context.getOrCreateSymbol(Twine("GCC_except_table") +
@@ -5244,7 +5246,7 @@ bool KVXTargetLowering::isUsedByReturnOnly(SDNode *N, SDValue &Chain) const {
     return false;
 
   SDValue TCChain = Chain;
-  SDNode *Copy = *N->use_begin();
+  SDNode *Copy = N->use_begin()->getNode();
   if (Copy->getOpcode() == ISD::CopyToReg) {
     // If the copy has a glue operand, we conservatively assume it isn't safe to
     // perform a tail call.
@@ -5256,7 +5258,7 @@ bool KVXTargetLowering::isUsedByReturnOnly(SDNode *N, SDValue &Chain) const {
     // f32 returned in a single GPR.
     if (!Copy->hasOneUse())
       return false;
-    Copy = *Copy->use_begin();
+    Copy = Copy->use_begin()->getNode();
     if (Copy->getOpcode() != ISD::CopyToReg || !Copy->hasNUsesOfValue(1, 0))
       return false;
     // If the copy has a glue operand, we conservatively assume it isn't safe to
@@ -5273,8 +5275,8 @@ bool KVXTargetLowering::isUsedByReturnOnly(SDNode *N, SDValue &Chain) const {
   if (Copy->use_empty())
     return false;
 
-  for (const SDNode *U : Copy->uses())
-    if (U->getOpcode() != KVXISD::RET)
+  for (const SDUse &Use : Copy->uses())
+    if (Use.getNode()->getOpcode() != KVXISD::RET)
       return false;
 
   Chain = TCChain;
@@ -5582,8 +5584,8 @@ SDValue KVXTargetLowering::expandVecLibCall(const LibCalls &Names,
     Type *ArgTy = ArgVT.getTypeForEVT(*DAG.getContext());
     Entry.Node = Op;
     Entry.Ty = ArgTy;
-    Entry.IsSExt = shouldSignExtendTypeInLibCall(ArgVT, IsSigned);
-    Entry.IsZExt = !shouldSignExtendTypeInLibCall(ArgVT, IsSigned);
+    Entry.IsSExt = shouldSignExtendTypeInLibCall(ArgTy, IsSigned);
+    Entry.IsZExt = !shouldSignExtendTypeInLibCall(ArgTy, IsSigned);
     Args.push_back(Entry);
   }
   SDValue Callee =
@@ -5609,7 +5611,7 @@ SDValue KVXTargetLowering::expandVecLibCall(const LibCalls &Names,
     InChain = TCChain;
 
   TargetLowering::CallLoweringInfo CLI(DAG);
-  bool SignExtend = shouldSignExtendTypeInLibCall(RetVT, IsSigned);
+  bool SignExtend = shouldSignExtendTypeInLibCall(RetTy, IsSigned);
   CLI.setDebugLoc(SDLoc(Node))
       .setChain(InChain)
       .setCallee(CallingConv::C, RetTy, Callee, std::move(Args))

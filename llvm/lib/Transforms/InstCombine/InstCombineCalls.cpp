@@ -3639,7 +3639,6 @@ Instruction *InstCombinerImpl::visitCallInst(CallInst &CI) {
       return II;
     }
 
-    if (match(Arg, m_ZExtOrSExtOrSelf(m_Value(Vect)))) {
     // KVX: Downstream!! Do not normalize i1 vector reductions.
     // i1 vectors are actually hold the same size of the vectors
     // compared and will incorrectly be legalized to a byte vector.

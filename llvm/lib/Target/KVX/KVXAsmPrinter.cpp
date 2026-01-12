@@ -15,8 +15,11 @@
 #include "KVXAsmPrinter.h"
 #include "InstPrinter/KVXInstPrinter.h"
 #include "KVXGenMCPseudoLowering.inc"
+#include "MCTargetDesc/KVXAsmInfo.h"
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/MC/TargetRegistry.h"
+
+using namespace llvm;
 
 static inline bool sortStr(const MCInst &Lhs, const MCInst &Rhs) {
   // Sort them in a string comparison manner
@@ -78,9 +81,10 @@ bool KVXAsmPrinter::runOnMachineFunction(MachineFunction &MF) {
 }
 
 void KVXAsmPrinter::emitInstruction(const MachineInstr *MI) {
-  // Do any auto-generated pseudo lowerings.
-  if (emitPseudoExpansionLowering(*OutStreamer, MI))
+  if (MCInst OutInst; lowerPseudoInstExpansion(MI, OutInst)) {
+    EmitToStreamer(*OutStreamer, OutInst);
     return;
+  }
 
   // Some MCYCLESp are not bundled: print them separately
   if (MI->getOpcode() == KVX::MCYCLESp) {

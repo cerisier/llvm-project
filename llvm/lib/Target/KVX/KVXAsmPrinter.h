@@ -28,9 +28,6 @@ public:
 
   void emitInstruction(const MachineInstr *MI) override;
 
-  bool emitPseudoExpansionLowering(MCStreamer &OutStreamer,
-                                   const MachineInstr *MI);
-
   bool PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
                        const char *ExtraCode, raw_ostream &OS) override;
   bool PrintAsmMemoryOperand(const MachineInstr *MI, unsigned OpNo,
@@ -42,6 +39,8 @@ public:
                         const MCSubtargetInfo *EndInfo) const override;
 
   bool runOnMachineFunction(MachineFunction &MF) override;
+
+  bool lowerPseudoInstExpansion(const MachineInstr *MI, MCInst &Inst);
 
     const TargetRegisterInfo *TRI;
 };

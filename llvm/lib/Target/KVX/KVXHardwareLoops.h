@@ -10,7 +10,6 @@
 #ifndef LLVM_LIB_TARGET_KVX_KVXHARDWARELOOPS_H
 #define LLVM_LIB_TARGET_KVX_KVXHARDWARELOOPS_H
 
-#include "llvm/Analysis/LoopInfo.h"
 #include "llvm/CodeGen/MachineBranchProbabilityInfo.h"
 #include "llvm/CodeGen/MachineDominators.h"
 #include "llvm/CodeGen/MachineLoopInfo.h"
@@ -39,10 +38,9 @@ public:
   bool runOnLoop(MachineLoop *Loop);
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.addRequired<MachineDominatorTree>();
-    AU.addRequired<LoopInfoWrapperPass>();
-    AU.addRequired<MachineLoopInfo>();
-    AU.addRequired<MachineBranchProbabilityInfo>();
+    AU.addRequired<MachineDominatorTreeWrapperPass>();
+    AU.addRequired<MachineLoopInfoWrapperPass>();
+    AU.addRequired<MachineBranchProbabilityInfoWrapperPass>();
 
     MachineFunctionPass::getAnalysisUsage(AU);
   }

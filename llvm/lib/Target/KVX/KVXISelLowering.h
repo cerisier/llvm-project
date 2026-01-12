@@ -112,7 +112,8 @@ private:
   bool CanLowerReturn(CallingConv::ID CallConv, MachineFunction &MF,
                       bool IsVarArg,
                       const SmallVectorImpl<ISD::OutputArg> &Outs,
-                      LLVMContext &Context) const override;
+                      LLVMContext &Context,
+                      const Type *RetTy) const override;
   SDValue LowerReturn(SDValue Chain, CallingConv::ID CallConv, bool IsVarArg,
                       const SmallVectorImpl<ISD::OutputArg> &Outs,
                       const SmallVectorImpl<SDValue> &OutVals, const SDLoc &DL,
@@ -269,9 +270,9 @@ private:
     return LLT(MVT::i32);
   }
 
-  MVT getVectorIdxTy(const DataLayout &DL) const override { return MVT::i64; }
-
-  bool isVectorShiftByScalarCheap(Type *Ty) const override { return true; }
+  unsigned getVectorIdxWidth(const DataLayout &DL) const override {
+    return 64;
+  }
 
   bool hasPairedLoad(EVT VT, Align &Alg) const override;
 

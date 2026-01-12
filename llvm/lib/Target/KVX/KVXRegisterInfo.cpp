@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "KVXRegisterInfo.h"
+#include <algorithm>
 #include "KVX.h"
 #include "KVXFrameLowering.h"
 #include "KVXMachineFunctionInfo.h"
@@ -96,17 +97,18 @@ KVXRegisterInfo::getLocalAreaAlignment(const MachineFunction &MF) const {
   const TargetFrameLowering *TFI = getFrameLowering(MF);
   const MachineFrameInfo &MFI = MF.getFrameInfo();
 
-  unsigned long Align = TFI->getStackAlignment();
+  uint64_t Align = TFI->getStackAlignment();
 
   for (int Fi = MFI.getObjectIndexBegin(); Fi < MFI.getObjectIndexEnd(); Fi++) {
     if (!MFI.isVariableSizedObjectIndex(Fi)) {
       if (MFI.getObjectAlign(Fi).value() > TFI->getStackAlignment()) {
-        Align = std::max(Align, MFI.getObjectAlign(Fi).value());
+        Align =
+            std::max<uint64_t>(Align, MFI.getObjectAlign(Fi).value());
       }
     }
   }
 
-  return Align;
+  return static_cast<unsigned>(Align);
 }
 
 // Local Area Realigned Register.
@@ -225,6 +227,8 @@ KVXRegisterInfo::getIntraCallClobberedRegs(const MachineFunction *MF) const {
   // FIXME: If the function definition is available, parse it to detect which
   // are not changed. e.g: No fp instructions and no set/wfx instructions, CS is
   // not changed. Same for PCR.
-  return {KVX::PM0, KVX::PM1, KVX::PM2, KVX::PM3, KVX::PM4,
-          KVX::PM5, KVX::PM6, KVX::PM7, KVX::PCR, KVX::CS};
+  static const MCPhysReg Clobbered[] = {KVX::PM0, KVX::PM1, KVX::PM2, KVX::PM3,
+                                        KVX::PM4, KVX::PM5, KVX::PM6, KVX::PM7,
+                                        KVX::PCR, KVX::CS};
+  return Clobbered;
 }

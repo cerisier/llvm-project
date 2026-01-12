@@ -1160,8 +1160,8 @@ void AsmPrinter::emitKill(const MachineInstr *MI) const {
     OS << ' ' << (Op.isDef() ? "def " : "killed ")
        << printReg(Op.getReg(), MF->getSubtarget().getRegisterInfo());
   }
-  AP.OutStreamer->AddComment(Str);
-  AP.OutStreamer->addBlankLine();
+  OutStreamer->AddComment(Str);
+  OutStreamer->addBlankLine();
 }
 
 static void emitFakeUse(const MachineInstr *MI, AsmPrinter &AP) {

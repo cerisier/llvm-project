@@ -480,7 +480,7 @@ bool KVXFrameLowering::restoreCalleeSavedRegisters(
   return true;
 }
 
-bool KVXFrameLowering::hasFP(const MachineFunction &MF) const {
+bool KVXFrameLowering::hasFPImpl(const MachineFunction &MF) const {
   if (MF.getFunction().hasFnAttribute(Attribute::Naked))
     return false;
 
