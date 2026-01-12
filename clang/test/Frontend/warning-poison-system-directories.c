@@ -11,8 +11,7 @@
 // RUN: FileCheck -check-prefix=WARN < %t.1.stderr %s
 
 // Missing target but included sysroot still causes the warning.
-// In cross-compilation, an external assembler might fail
-// RUN: %clang -Wpoison-system-directories -I/usr/include --sysroot %S/Inputs/sysroot_x86_64_cross_linux_tree -c -o - %s 2> %t.2.stderr || true
+// RUN: %clang -Wpoison-system-directories -I/usr/include --sysroot %S/Inputs/sysroot_x86_64_cross_linux_tree -c -o - %s 2> %t.2.stderr
 // RUN: FileCheck -check-prefix=WARN < %t.2.stderr %s
 
 // With -Werror the warning causes the failure.

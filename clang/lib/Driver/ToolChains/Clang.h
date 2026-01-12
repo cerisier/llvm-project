@@ -75,8 +75,6 @@ private:
                         llvm::opt::ArgStringList &CmdArgs) const;
   void AddHexagonTargetArgs(const llvm::opt::ArgList &Args,
                             llvm::opt::ArgStringList &CmdArgs) const;
-  void AddKVXTargetArgs(const llvm::opt::ArgList &Args,
-                        llvm::opt::ArgStringList &CmdArgs) const;
   void AddLanaiTargetArgs(const llvm::opt::ArgList &Args,
                           llvm::opt::ArgStringList &CmdArgs) const;
   void AddWebAssemblyTargetArgs(const llvm::opt::ArgList &Args,

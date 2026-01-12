@@ -248,11 +248,6 @@ serialization::TypeIdxFromBuiltin(const BuiltinType *BT) {
     ID = PREDEF_TYPE_##Id##_ID; \
     break;
 #include "clang/Basic/PPCTypes.def"
-#define KVX_TCA_VECTOR_TYPE(Name, Id, Size) \
-  case BuiltinType::Id: \
-    ID = PREDEF_TYPE_##Id##_ID; \
-    break;
-#include "clang/Basic/KVXTypes.def"
 #define RVV_TYPE(Name, Id, SingletonId)                                        \
   case BuiltinType::Id:                                                        \
     ID = PREDEF_TYPE_##Id##_ID;                                                \

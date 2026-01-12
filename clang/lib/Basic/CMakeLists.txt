@@ -75,7 +75,6 @@ add_clang_library(clangBasic
   LangStandards.cpp
   MakeSupport.cpp
   Module.cpp
-  NoSanitizeList.cpp
   ObjCRuntime.cpp
   OffloadArch.cpp
   OpenCLOptions.cpp
@@ -83,6 +82,7 @@ add_clang_library(clangBasic
   OperatorPrecedence.cpp
   ParsedAttrInfo.cpp
   ProfileList.cpp
+  NoSanitizeList.cpp
   SanitizerSpecialCaseList.cpp
   Sanitizers.cpp
   Sarif.cpp
@@ -122,7 +122,7 @@ add_clang_library(clangBasic
   Targets/WebAssembly.cpp
   Targets/X86.cpp
   Targets/XCore.cpp
-  Targets/KVX.cpp
+  Targets/Xtensa.cpp
   TokenKinds.cpp
   TypeTraits.cpp
   Version.cpp
@@ -134,6 +134,8 @@ add_clang_library(clangBasic
   DEPENDS
   omp_gen
   ClangDriverOptions
+  # These generated headers are included transitively.
+  target_parser_gen
   )
 
 target_link_libraries(clangBasic

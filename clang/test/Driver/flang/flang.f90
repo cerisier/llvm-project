@@ -1,4 +1,3 @@
-! REQUIRES: object-emission
 ! Check that flang -fc1 is invoked when in --driver-mode=flang.
 
 ! This is a copy of flang_ucase.F90 because the driver has logic in it which

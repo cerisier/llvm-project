@@ -1,4 +1,3 @@
-// UNSUPPORTED: target=kvx-{{.*}}
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 

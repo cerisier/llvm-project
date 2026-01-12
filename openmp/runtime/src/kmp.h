@@ -63,13 +63,6 @@
 #undef KMP_CANCEL_THREADS
 #endif
 
-#if KMP_OS_CLUSTER_OS
-#undef KMP_CANCEL_THREADS
-
-// COS doesn't have any hostname. A temporary one is MPPA3
-#define KMP_CLUSTER_OS_HOSTNAME "MPPA3"
-#define KMP_CLUSTER_OS_HOSTNAME_LENGTH strlen(KMP_CLUSTER_OS_HOSTNAME)
-#endif
 // Some WASI targets (e.g., wasm32-wasi-threads) do not support thread
 // cancellation.
 #if KMP_OS_WASI
@@ -625,10 +618,6 @@ typedef int PACKED_REDUCTION_METHOD_T;
 #if !KMP_OS_WASI
 #include <dlfcn.h>
 #endif
-#include <pthread.h>
-#endif
-
-#if KMP_OS_CLUSTER_OS
 #include <pthread.h>
 #endif
 
@@ -1389,7 +1378,7 @@ extern kmp_uint64 __kmp_now_nsec();
 #if KMP_OS_WINDOWS
 #define KMP_INIT_WAIT 64U /* initial number of spin-tests   */
 #define KMP_NEXT_WAIT 32U /* susequent number of spin-tests */
-#elif KMP_OS_LINUX || KMP_OS_CLUSTER_OS
+#elif KMP_OS_LINUX
 #define KMP_INIT_WAIT 1024U /* initial number of spin-tests   */
 #define KMP_NEXT_WAIT 512U /* susequent number of spin-tests */
 #elif KMP_OS_DARWIN
@@ -1768,7 +1757,7 @@ typedef HANDLE kmp_thread_t;
 typedef DWORD kmp_key_t;
 #endif /* KMP_OS_WINDOWS */
 
-#if KMP_OS_UNIX || KMP_OS_CLUSTER_OS
+#if KMP_OS_UNIX
 typedef pthread_t kmp_thread_t;
 typedef pthread_key_t kmp_key_t;
 #endif
@@ -2340,7 +2329,7 @@ typedef struct kmp_win32_cond {
 } kmp_win32_cond_t;
 #endif
 
-#if KMP_OS_UNIX || KMP_OS_CLUSTER_OS
+#if KMP_OS_UNIX
 
 union KMP_ALIGN_CACHE kmp_cond_union {
   double c_align;
@@ -3122,7 +3111,7 @@ typedef struct KMP_ALIGN_CACHE kmp_base_info {
   kmp_win32_mutex_t th_suspend_mx;
   std::atomic<int> th_suspend_init;
 #endif
-#if KMP_OS_UNIX || KMP_OS_CLUSTER_OS
+#if KMP_OS_UNIX
   kmp_cond_align_t th_suspend_cv;
   kmp_mutex_align_t th_suspend_mx;
   std::atomic<int> th_suspend_init_count;
@@ -3135,7 +3124,7 @@ typedef struct KMP_ALIGN_CACHE kmp_base_info {
 #if KMP_STATS_ENABLED
   kmp_stats_list *th_stats;
 #endif
-#if KMP_OS_UNIX || KMP_OS_CLUSTER_OS
+#if KMP_OS_UNIX
   std::atomic<bool> th_blocking;
 #endif
   kmp_cg_root_t *th_cg_roots; // list of cg_roots associated with this thread

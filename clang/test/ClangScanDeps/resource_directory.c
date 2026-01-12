@@ -1,4 +1,3 @@
-// UNSUPPORTED: target=kvx-{{.*}}
 // REQUIRES: shell
 
 // RUN: rm -rf %t && mkdir %t

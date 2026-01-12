@@ -1928,7 +1928,7 @@ protected:
     unsigned : NumTypeBits;
 
     /// The kind (BuiltinType::Kind) of builtin type this is.
-    static constexpr unsigned NumOfBuiltinTypeBits = 10;
+    static constexpr unsigned NumOfBuiltinTypeBits = 9;
     unsigned Kind : NumOfBuiltinTypeBits;
   };
 
@@ -3104,9 +3104,6 @@ public:
 // PPC MMA Types
 #define PPC_VECTOR_TYPE(Name, Id, Size) Id,
 #include "clang/Basic/PPCTypes.def"
-// KVX TCA Types
-#define KVX_TCA_VECTOR_TYPE(Name, Id, Size) Id,
-#include "clang/Basic/KVXTypes.def"
 // RVV Types
 #define RVV_TYPE(Name, Id, SingletonId) Id,
 #include "clang/Basic/RISCVVTypes.def"
