@@ -1310,11 +1310,14 @@ cc_library(
         "include/clang/Testing/TestLanguage.def",
     ],
     deps = [
+        ":ast",
         ":basic",
         ":frontend",
         ":lex",
+        ":serialization",
         "//llvm:MC",
         "//llvm:Support",
+        "//llvm:TargetParser",
         "//third-party/unittest:gtest",
     ],
 )
