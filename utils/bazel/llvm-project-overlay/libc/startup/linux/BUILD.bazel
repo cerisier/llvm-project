@@ -1,0 +1,71 @@
+# This file is licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//libc:libc_build_rules.bzl", "libc_startup_library", "libc_support_library")
+
+package(default_visibility = ["//visibility:public"])
+
+libc_startup_library(
+    name = "crti_library",
+    srcs = ["crti.cpp"],
+)
+
+libc_startup_library(
+    name = "crtn_library",
+    srcs = ["crtn.cpp"],
+)
+
+libc_support_library(
+    name = "do_start_hdr",
+    hdrs = ["do_start.h"],
+    deps = [
+        "//libc:__support_macros_config",
+        "//libc:config_app_h",
+    ],
+)
+
+libc_support_library(
+    name = "irelative_hdr",
+    hdrs = ["irelative.h"],
+    deps = [
+        "//libc:__support_macros_config",
+        "//libc:hdr_link_macros",
+        "//libc:hdr_stdint_proxy",
+    ],
+)
+
+libc_startup_library(
+    name = "gnu_property_section",
+    srcs = ["gnu_property_section.cpp"],
+    hdrs = ["gnu_property_section.h"],
+    deps = [
+        "//libc:__support_cpp_string_view",
+        "//libc:__support_macros_attributes",
+        "//libc:__support_macros_config",
+        "//libc:hdr_elf_proxy",
+        "//libc:hdr_link_macros",
+        "//libc:string_memory_utils",
+    ],
+)
+
+libc_startup_library(
+    name = "do_start",
+    srcs = ["do_start.cpp"],
+    deps = [
+        ":do_start_hdr",
+        ":gnu_property_section",
+        ":irelative_hdr",
+        "//libc:__support_macros_config",
+        "//libc:__support_osutil_linux_auxv",
+        "//libc:__support_osutil_syscall",
+        "//libc:__support_threads_thread_headers",
+        "//libc:config_linux_app_h",
+        "//libc:environ",
+        "//libc:func_atexit",
+        "//libc:func_exit",
+        "//libc:hdr_elf_proxy",
+        "//libc:hdr_link_macros",
+        "//libc:hdr_stdint_proxy",
+    ],
+)

@@ -155,7 +155,7 @@ config_setting(
 alias(
     name = "full_build_kernel_headers",
     actual = "@linux_uapi//:linux_uapi_headers",
-    visibility = ["//visibility:private"],
+    visibility = ["//libc:__subpackages__"],
 )
 
 ########################### Header Generation ##################################
@@ -337,6 +337,27 @@ cc_library(
 )
 
 ################################## Base Config #################################
+
+libc_support_library(
+    name = "config_linux_app_h",
+    hdrs = ["config/linux/app.h"],
+    deps = [
+        ":__support_macros_config",
+        ":__support_macros_properties_architectures",
+        ":hdr_stdint_proxy",
+    ],
+)
+
+libc_support_library(
+    name = "config_app_h",
+    hdrs = ["config/app.h"],
+    deps = [
+        ":__support_macros_properties_architectures",
+    ] + select({
+        "@platforms//os:linux": [":config_linux_app_h"],
+        "//conditions:default": [],
+    }),
+)
 
 libc_support_library(
     name = "__support_macros_config",
@@ -627,9 +648,14 @@ libc_support_library(
 
 libc_support_library(
     name = "hdr_elf_proxy",
-    hdrs = ["staging/hdr/elf_proxy.h"],
+    hdrs = [":hdr_elf_proxy_h"],
     includes = ["staging"],
-    deps = [":hdr_elf_proxy_h"],
+)
+
+cc_library(
+    name = "hdr_elf_macros",
+    hdrs = ["hdr/elf_macros.h"],
+    deps = [":public_headers_deps"],
 )
 
 libc_support_library(
@@ -638,6 +664,24 @@ libc_support_library(
 )
 
 ############################ Type Proxy Header Files ###########################
+
+cc_library(
+    name = "func_atexit",
+    hdrs = [
+        "hdr/types/atexithandler_t.h",
+        "src/stdlib/atexit.h",
+    ],
+    deps = [
+        ":__support_macros_config",
+        ":public_headers_deps",
+    ],
+)
+
+libc_support_library(
+    name = "func_exit",
+    hdrs = ["src/stdlib/exit.h"],
+    deps = [":__support_macros_config"],
+)
 
 libc_support_library(
     name = "func_aligned_alloc",

@@ -65,13 +65,14 @@ def libc_release_copts():
     })
     return copts + platform_copts
 
-def _libc_library(name, deps = [], public_packaging = False, **kwargs):
+def _libc_library(name, deps = [], public_packaging = False, startup = False, **kwargs):
     """Internal macro to serve as a base for all other libc library rules.
 
     Args:
       name: Target name.
       deps: Dependencies of the library.
       public_packaging: Export the C entrypoint in a full build.
+      startup: Disable stack protection for objects that run before TLS setup.
       **kwargs: All other attributes relevant for the cc_library rule.
     """
 
@@ -93,7 +94,7 @@ def _libc_library(name, deps = [], public_packaging = False, **kwargs):
 
     cc_library(
         name = name,
-        copts = libc_common_copts(),
+        copts = libc_common_copts() + (["-fpie", "-fno-stack-protector", "-fno-addrsig"] if startup else []),
         deps = deps + full_build_deps,
         local_defines = LIBC_CONFIGURE_OPTIONS + public_defines,
         linkstatic = 1,
@@ -105,6 +106,18 @@ def _libc_library(name, deps = [], public_packaging = False, **kwargs):
 # libc_support_library.
 def libc_support_library(name, **kwargs):
     _libc_library(name = name, **kwargs)
+
+def libc_startup_library(name, target_compatible_with = [], **kwargs):
+    """Build an object for the Linux process startup files."""
+    _libc_library(
+        name = name,
+        startup = True,
+        target_compatible_with = target_compatible_with + select({
+            Label(":full_build_linux"): [],
+            "//conditions:default": ["@platforms//:incompatible"],
+        }),
+        **kwargs
+    )
 
 def libc_function(name, **kwargs):
     """Add target for a libc function.
