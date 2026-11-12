@@ -25,7 +25,13 @@
 
 extern "C" int main(int argc, char **argv, char **envp);
 
+static char empty_program_name[] = "";
+
 extern "C" {
+// Used by the Linux err and warn entrypoints.
+[[gnu::visibility("hidden")]] char *program_invocation_short_name =
+    empty_program_name;
+
 // These arrays are present in the .init_array and .fini_array sections.
 // The symbols are inserted by linker when it sees references to them.
 extern uintptr_t __preinit_array_start[];
@@ -82,6 +88,14 @@ static TLSDescriptor tls;
 
   // Initialize the POSIX global declared in unistd.h
   environ = reinterpret_cast<char **>(env_ptr);
+
+  if (app.args->argc > 0 && app.args->argv[0] != 0) {
+    char *program_name = reinterpret_cast<char *>(app.args->argv[0]);
+    program_invocation_short_name = program_name;
+    for (char *p = program_name; *p != '\0'; ++p)
+      if (*p == '/')
+        program_invocation_short_name = p + 1;
+  }
 
   // After the env array, is the aux-vector. The end of the aux-vector is
   // denoted by an AT_NULL entry.
