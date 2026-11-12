@@ -12,7 +12,7 @@ is discoverable with the following command:
 """
 
 # This list of definitions is used to customize LLVM libc.
-LIBC_CONFIGURE_OPTIONS = [
+_OVERLAY_OPTIONS = [
     # Documentation in libc/docs/dev/printf_behavior.rst
     # "LIBC_COPT_FLOAT_TO_STR_NO_SPECIALIZE_LD",
     # "LIBC_COPT_FLOAT_TO_STR_NO_TABLE",
@@ -58,3 +58,20 @@ LIBC_CONFIGURE_OPTIONS = [
     # Documentation in libc/src/__support/time/monotonicity.h
     "LIBC_COPT_TIMEOUT_ENSURE_MONOTONICITY",
 ]
+
+_FULL_BUILD_OPTIONS = [
+    "LIBC_ADD_NULL_CHECKS",
+    "LIBC_CONF_WCTYPE_MODE=LIBC_WCTYPE_MODE_ASCII",
+    "LIBC_COPT_FIND_FIRST_CHARACTER_IMPL=word",
+    "LIBC_COPT_RAW_MUTEX_DEFAULT_SPIN_COUNT=100",
+    "LIBC_COPT_STRING_LENGTH_IMPL=clang_vector",
+    "LIBC_COPT_TIMEOUT_ENSURE_MONOTONICITY",
+    "LIBC_ERRNO_MODE=LIBC_ERRNO_MODE_DEFAULT",
+    "LIBC_QSORT_IMPL=LIBC_QSORT_QUICK_SORT",
+    "LIBC_THREAD_MODE=LIBC_THREAD_MODE_PLATFORM",
+]
+
+LIBC_CONFIGURE_OPTIONS = select({
+    Label(":full_build"): _FULL_BUILD_OPTIONS,
+    "//conditions:default": _OVERLAY_OPTIONS,
+})

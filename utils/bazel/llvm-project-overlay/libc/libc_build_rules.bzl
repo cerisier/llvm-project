@@ -19,7 +19,29 @@ def libc_common_copts():
         "-I" + libc_include_path,
         "-I" + paths.join(libc_include_path, "include"),
         "-DLIBC_NAMESPACE=" + LIBC_NAMESPACE,
-    ]
+    ] + select({
+        Label(":full_build"): [
+            "-std=gnu++17",
+            "-DLIBC_FULL_BUILD",
+            "-ffreestanding",
+            "-fno-asynchronous-unwind-tables",
+            "-fno-builtin",
+            "-fno-exceptions",
+            "-fno-lax-vector-conversions",
+            "-fno-omit-frame-pointer",
+            "-fno-rtti",
+            "-fno-unwind-tables",
+            "-fstack-protector-strong",
+            "-ftrivial-auto-var-init=pattern",
+            "-fvisibility-inlines-hidden",
+            "-nostdinc++",
+            "-nostdlibinc",
+        ],
+        "//conditions:default": [],
+    }) + select({
+        Label(":full_build_x86_64"): ["-mno-omit-leaf-frame-pointer"],
+        "//conditions:default": [],
+    })
 
 def libc_release_copts():
     copts = [
@@ -43,21 +65,37 @@ def libc_release_copts():
     })
     return copts + platform_copts
 
-def _libc_library(name, **kwargs):
+def _libc_library(name, deps = [], public_packaging = False, **kwargs):
     """Internal macro to serve as a base for all other libc library rules.
 
     Args:
       name: Target name.
+      deps: Dependencies of the library.
+      public_packaging: Export the C entrypoint in a full build.
       **kwargs: All other attributes relevant for the cc_library rule.
     """
 
     for attr in ["copts", "local_defines"]:
         if attr in kwargs:
             fail("disallowed attribute: '{}' in rule: '{}'".format(attr, name))
+
+    full_build_deps = select({
+        Label(":full_build"): [Label(":public_headers"), Label(":public_headers_deps")],
+        "//conditions:default": [],
+    }) + select({
+        Label(":full_build_linux"): [Label(":full_build_kernel_headers")],
+        "//conditions:default": [],
+    })
+    public_defines = select({
+        Label(":full_build"): ["LIBC_COPT_PUBLIC_PACKAGING"],
+        "//conditions:default": [],
+    }) if public_packaging else []
+
     cc_library(
         name = name,
         copts = libc_common_copts(),
-        local_defines = LIBC_CONFIGURE_OPTIONS,
+        deps = deps + full_build_deps,
+        local_defines = LIBC_CONFIGURE_OPTIONS + public_defines,
         linkstatic = 1,
         **kwargs
     )
@@ -82,7 +120,7 @@ def libc_function(name, **kwargs):
     # Builds "internal" library with a function, exposed as a C++ function in
     # the "LIBC_NAMESPACE" namespace. This allows us to test the function in the
     # presence of another libc.
-    _libc_library(name = name, **kwargs)
+    _libc_library(name = name, public_packaging = True, **kwargs)
 
 LibcLibraryInfo = provider(
     "All source files and textual headers for building a particular library.",

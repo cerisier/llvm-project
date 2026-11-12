@@ -125,6 +125,39 @@ config_setting(
     flag_values = {":modular_format": "enable"},
 )
 
+# Build libc either on top of the system libc or as a standalone runtime.
+string_flag(
+    name = "build_mode",
+    build_setting_default = "overlay",
+    values = [
+        "overlay",
+        "full",
+    ],
+)
+
+config_setting(
+    name = "full_build",
+    flag_values = {":build_mode": "full"},
+)
+
+config_setting(
+    name = "full_build_linux",
+    constraint_values = ["@platforms//os:linux"],
+    flag_values = {":build_mode": "full"},
+)
+
+config_setting(
+    name = "full_build_x86_64",
+    constraint_values = [PLATFORM_CPU_X86_64],
+    flag_values = {":build_mode": "full"},
+)
+
+alias(
+    name = "full_build_kernel_headers",
+    actual = "@linux_uapi//:linux_uapi_headers",
+    visibility = ["//visibility:private"],
+)
+
 ########################### Header Generation ##################################
 
 py_binary(
@@ -298,7 +331,7 @@ cc_library(
 # Textual versions of the static headers. These are taken from the source tree
 # and are separate from the generated headers above. They are used for
 # testing purposes.
-libc_support_library(
+cc_library(
     name = "public_headers_deps",
     textual_hdrs = STATIC_AND_CONDITIONAL_HEADERS,
 )
@@ -1383,6 +1416,18 @@ libc_support_library(
 libc_support_library(
     name = "__support_libc_assert",
     hdrs = ["src/__support/libc_assert.h"],
+    deps = select({
+        ":full_build": [
+            ":__support_integer_to_string",
+            ":__support_macros_attributes",
+            ":__support_macros_config",
+            ":__support_macros_macro_utils",
+            ":__support_macros_optimization",
+            ":__support_osutil_exit_hdrs",
+            ":__support_osutil_io",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 libc_support_library(
@@ -2826,9 +2871,14 @@ libc_support_library(
 )
 
 libc_support_library(
+    name = "__support_osutil_exit_hdrs",
+    hdrs = ["src/__support/OSUtil/exit.h"],
+    deps = [":__support_macros_config"],
+)
+
+libc_support_library(
     name = "__support_osutil_exit",
     srcs = ["src/__support/OSUtil/linux/exit.cpp"],
-    hdrs = ["src/__support/OSUtil/exit.h"],
     target_compatible_with = select({
         "@platforms//os:linux": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -2836,6 +2886,7 @@ libc_support_library(
     deps = [
         ":__support_common",
         ":__support_macros_config",
+        ":__support_osutil_exit_hdrs",
         ":__support_osutil_syscall",
     ],
 )
@@ -2957,13 +3008,35 @@ libc_support_library(
 )
 
 libc_support_library(
+    name = "__support_threads_thread_headers",
+    hdrs = ["src/__support/threads/thread.h"],
+    target_compatible_with = select({
+        ":full_build_linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":__support_cpp_atomic",
+        ":__support_cpp_optional",
+        ":__support_cpp_string_view",
+        ":__support_cpp_stringstream",
+        ":__support_macros_attributes",
+        ":__support_macros_config",
+        ":__support_macros_properties_architectures",
+        ":hdr_stdint_proxy",
+    ],
+)
+
+libc_support_library(
     name = "__support_threads_identifier",
     hdrs = ["src/__support/threads/identifier.h"],
     deps = [
         ":__support_macros_optimization",
         ":__support_osutil_syscall",
         ":types_pid_t",
-    ],
+    ] + select({
+        ":full_build_linux": [":__support_threads_thread_headers"],
+        "//conditions:default": [],
+    }),
 )
 
 libc_support_library(
