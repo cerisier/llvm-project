@@ -3134,6 +3134,7 @@ libc_support_library(
         ":__support_threads_linux_futex_utils",
         ":__support_threads_sleep",
         ":__support_time",
+        ":__support_time_clock_conversion",
         ":hdr_errno_macros",
     ],
 )
