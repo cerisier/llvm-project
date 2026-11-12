@@ -249,6 +249,7 @@ LLVM_LIBC_HEADERS = [
     libc_header_info("sys/statvfs"),
     libc_header_info("sys/time"),
     libc_header_info("sys/types"),
+    libc_header_info("sys/uio"),
     libc_header_info("sys/utsname"),
     libc_header_info("sys/wait"),
     libc_header_info("sysexits"),
@@ -807,6 +808,11 @@ libc_support_library(
 libc_support_library(
     name = "types_struct_rlimit",
     hdrs = ["hdr/types/struct_rlimit.h"],
+)
+
+libc_support_library(
+    name = "types_cpu_set_t",
+    hdrs = ["hdr/types/cpu_set_t.h"],
 )
 
 libc_support_library(
@@ -13709,6 +13715,55 @@ libc_function(
 ############################### stdlib targets ###############################
 
 libc_function(
+    name = "abort",
+    srcs = ["src/stdlib/abort.cpp"],
+    hdrs = ["src/stdlib/abort.h"],
+    target_compatible_with = select({
+        ":full_build_linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [":stdlib_abort_utils"],
+)
+
+libc_support_library(
+    name = "stdlib_environ_internal",
+    srcs = ["src/stdlib/environ_internal.cpp"],
+    hdrs = ["src/stdlib/environ_internal.h"],
+    copts = ["-DLIBC_COPT_SUPPORT_ENVIRON"],
+    target_compatible_with = select({
+        ":full_build_linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":__support_alloc_checker",
+        ":__support_cpp_new",
+        ":__support_cpp_optional",
+        ":__support_cpp_string_view",
+        ":__support_macros_attributes",
+        ":__support_macros_config",
+        ":config_app_h",
+        ":environ",
+        ":string_memory_utils",
+        ":types_size_t",
+    ],
+)
+
+libc_function(
+    name = "getenv",
+    srcs = ["src/stdlib/getenv.cpp"],
+    hdrs = ["src/stdlib/getenv.h"],
+    target_compatible_with = select({
+        ":full_build_linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":__support_common",
+        ":__support_macros_config",
+        ":stdlib_environ_internal",
+    ],
+)
+
+libc_function(
     name = "_Exit",
     srcs = ["src/stdlib/_Exit.cpp"],
     hdrs = ["src/stdlib/_Exit.h"],
@@ -13733,6 +13788,106 @@ libc_support_library(
         ":__support_fixedvector",
         ":__support_macros_config",
         ":__support_threads_mutex",
+    ],
+)
+
+libc_support_library(
+    name = "__support_osutil_linux_syscall_wrappers_rt_sigprocmask",
+    hdrs = ["src/__support/OSUtil/linux/syscall_wrappers/rt_sigprocmask.h"],
+    deps = [
+        ":__support_common",
+        ":__support_error_or",
+        ":__support_macros_config",
+        ":__support_osutil_syscall",
+        ":types_sigset_t",
+    ],
+)
+
+libc_support_library(
+    name = "__support_osutil_linux_syscall_wrappers_raise",
+    hdrs = ["src/__support/OSUtil/linux/syscall_wrappers/raise.h"],
+    deps = [
+        ":__support_common",
+        ":__support_error_or",
+        ":__support_macros_config",
+        ":__support_osutil_linux_syscall_wrappers_rt_sigprocmask",
+        ":__support_osutil_syscall",
+        ":hdr_signal_macros",
+        ":types_sigset_t",
+    ],
+)
+
+libc_support_library(
+    name = "__restore_rt",
+    srcs = ["src/signal/linux/__restore.cpp"],
+    copts = [
+        "-O3",
+        "-fomit-frame-pointer",
+        "-Wframe-larger-than=0",
+        "-Wno-attributes",
+        "-fno-sanitize=address",
+    ],
+    target_compatible_with = select({
+        ":full_build_linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":__support_macros_config",
+        ":__support_osutil_syscall",
+    ],
+)
+
+libc_support_library(
+    name = "__signal_utils",
+    hdrs = [
+        "hdr/types/siginfo_t.h",
+        "hdr/types/struct_sigaction.h",
+        "src/signal/linux/signal_utils.h",
+    ],
+    deps = [
+        ":__restore_rt",
+        ":__support_common",
+        ":__support_error_or",
+        ":__support_macros_config",
+        ":__support_osutil_linux_syscall_wrappers_rt_sigprocmask",
+        ":__support_osutil_syscall",
+        ":__support_osutil_vdso",
+        ":__support_threads_raw_rwlock",
+        ":hdr_signal_macros",
+        ":types_sigset_t",
+        ":types_size_t",
+    ],
+)
+
+libc_support_library(
+    name = "stdlib_abort_utils",
+    hdrs = [
+        "src/stdlib/abort_utils.h",
+        "src/stdlib/linux/abort_utils.h",
+    ],
+    deps = [
+        ":__signal_utils",
+        ":__support_common",
+        ":__support_macros_config",
+        ":__support_macros_properties_architectures",
+        ":__support_osutil_exit",
+        ":__support_osutil_linux_syscall_wrappers_raise",
+        ":types_sigset_t",
+    ],
+)
+
+libc_support_library(
+    name = "__stack_chk_fail",
+    srcs = ["src/compiler/generic/__stack_chk_fail.cpp"],
+    hdrs = ["src/compiler/__stack_chk_fail.h"],
+    target_compatible_with = select({
+        ":full_build_linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":__support_osutil_io",
+        ":hdr_stdint_proxy",
+        ":stdlib_abort_utils",
     ],
 )
 
@@ -13762,8 +13917,8 @@ libc_function(
     deps = [
         ":__support_common",
         ":__support_macros_config",
-        ":__support_threads_thread",
         ":__support_osutil_exit",
+        ":__support_threads_thread",
         ":func_exit",
     ],
 )
@@ -14413,6 +14568,21 @@ libc_function(
         ":__support_macros_null_check",
         ":string_memory_utils",
         ":string_utils",
+    ],
+)
+
+libc_function(
+    name = "strerror",
+    srcs = ["src/string/strerror.cpp"],
+    hdrs = ["src/string/strerror.h"],
+    target_compatible_with = select({
+        ":full_build_linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":__support_common",
+        ":__support_macros_config",
+        ":__support_stringutil",
     ],
 )
 
@@ -15238,20 +15408,22 @@ libc_function(
     ],
 )
 
-#TODO: Enable once fullbuild is added to bazel, since this depends on a macro
-# definition in the public header
-
-# libc_function(
-#     name = "syscall",
-#     srcs = ["src/unistd/linux/syscall.cpp"],
-#     hdrs = ["src/unistd/syscall.h"],
-#     deps = [
-#         ":__support_common",
-#         ":__support_osutil_syscall",
-#         ":errno",
-#         ":hdr_unistd_macros",
-#     ],
-# )
+libc_function(
+    name = "syscall",
+    srcs = ["src/unistd/linux/syscall.cpp"],
+    hdrs = ["src/unistd/syscall.h"],
+    target_compatible_with = select({
+        ":full_build_linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":__support_common",
+        ":__support_libc_errno",
+        ":__support_macros_config",
+        ":__support_osutil_syscall",
+        ":hdr_unistd_macros",
+    ],
+)
 
 libc_function(
     name = "swab",
@@ -15616,6 +15788,24 @@ libc_function(
         ":stdout",
         ":types_FILE",
         ":vfprintf_internal",
+    ],
+)
+
+libc_function(
+    name = "fputs",
+    srcs = ["src/stdio/generic/fputs.cpp"],
+    hdrs = ["src/stdio/fputs.h"],
+    target_compatible_with = select({
+        ":full_build_linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":__support_common",
+        ":__support_cpp_string_view",
+        ":__support_file_file",
+        ":__support_libc_errno",
+        ":__support_macros_config",
+        ":types_FILE",
     ],
 )
 
@@ -16982,5 +17172,58 @@ libc_function(
         ":__support_macros_config",
         ":types_size_t",
         ":types_wchar_t",
+    ],
+)
+
+libc_function(
+    name = "sched_getaffinity",
+    srcs = ["src/sched/linux/sched_getaffinity.cpp"],
+    hdrs = ["src/sched/sched_getaffinity.h"],
+    target_compatible_with = select({
+        ":full_build_linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":__support_common",
+        ":__support_libc_errno",
+        ":__support_macros_config",
+        ":__support_osutil_syscall",
+        ":hdr_stdint_proxy",
+        ":types_cpu_set_t",
+        ":types_pid_t",
+        ":types_size_t",
+    ],
+)
+
+libc_function(
+    name = "__sched_getcpucount",
+    srcs = ["src/sched/linux/sched_getcpucount.cpp"],
+    hdrs = ["src/sched/sched_getcpucount.h"],
+    target_compatible_with = select({
+        ":full_build_linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":__support_common",
+        ":__support_cpp_bit",
+        ":__support_macros_config",
+        ":types_cpu_set_t",
+        ":types_size_t",
+    ],
+)
+
+libc_function(
+    name = "clock_gettime",
+    srcs = ["src/time/linux/clock_gettime.cpp"],
+    hdrs = ["src/time/clock_gettime.h"],
+    target_compatible_with = select({
+        ":full_build_linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":__support_common",
+        ":__support_libc_errno",
+        ":__support_macros_config",
+        ":__support_time_clock_gettime",
     ],
 )
