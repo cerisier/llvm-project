@@ -3174,6 +3174,61 @@ libc_support_library(
 )
 
 libc_support_library(
+    name = "__support_threads_linux_thread",
+    srcs = ["src/__support/threads/linux/thread.cpp"],
+    copts = [
+        "-O3",
+        "-fno-omit-frame-pointer",
+        "-Wno-frame-address",
+    ],
+    target_compatible_with = select({
+        ":full_build_linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":__support_common",
+        ":__support_cpp_atomic",
+        ":__support_cpp_string_view",
+        ":__support_cpp_stringstream",
+        ":__support_error_or",
+        ":__support_libc_errno",
+        ":__support_macros_config",
+        ":__support_osutil_linux_syscall_wrappers_mmap",
+        ":__support_osutil_linux_syscall_wrappers_mprotect",
+        ":__support_osutil_linux_syscall_wrappers_munmap",
+        ":__support_osutil_linux_syscall_wrappers_open",
+        ":__support_osutil_syscall",
+        ":__support_threads_linux_futex_utils",
+        ":__support_threads_thread_headers",
+        ":config_app_h",
+        ":hdr_errno_macros",
+        ":hdr_fcntl_macros",
+        ":hdr_stdint_proxy",
+        ":hdr_sys_mman_macros",
+    ],
+)
+
+libc_support_library(
+    name = "__support_threads_thread",
+    srcs = ["src/__support/threads/thread.cpp"],
+    target_compatible_with = select({
+        ":full_build_linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":__support_cpp_array",
+        ":__support_cpp_mutex",
+        ":__support_cpp_optional",
+        ":__support_fixedvector",
+        ":__support_macros_attributes",
+        ":__support_macros_config",
+        ":__support_threads_linux_thread",
+        ":__support_threads_mutex",
+        ":__support_threads_thread_headers",
+    ],
+)
+
+libc_support_library(
     name = "__support_threads_callonce",
     hdrs = ["src/__support/threads/callonce.h"],
     target_compatible_with = select({
@@ -13506,6 +13561,151 @@ bit_prefix_needs_math_list = [
     for bit_suffix in bit_suffix_list
 ]
 
+############################## pthread targets ##############################
+
+_PTHREAD_LINUX_ONLY = select({
+    ":full_build_linux": [],
+    "//conditions:default": ["@platforms//:incompatible"],
+})
+
+[
+    libc_function(
+        name = name,
+        srcs = ["src/pthread/" + name + ".cpp"],
+        hdrs = ["src/pthread/" + name + ".h"],
+        target_compatible_with = _PTHREAD_LINUX_ONLY,
+        deps = [
+            ":__support_common",
+            ":__support_macros_config",
+        ],
+    )
+    for name in [
+        "pthread_attr_destroy",
+        "pthread_attr_getdetachstate",
+        "pthread_attr_getguardsize",
+        "pthread_attr_getstacksize",
+    ]
+]
+
+libc_function(
+    name = "pthread_attr_init",
+    srcs = ["src/pthread/pthread_attr_init.cpp"],
+    hdrs = ["src/pthread/pthread_attr_init.h"],
+    target_compatible_with = _PTHREAD_LINUX_ONLY,
+    deps = [
+        ":__support_common",
+        ":__support_macros_config",
+        ":__support_threads_thread_headers",
+    ],
+)
+
+libc_function(
+    name = "pthread_attr_getstack",
+    srcs = ["src/pthread/pthread_attr_getstack.cpp"],
+    hdrs = ["src/pthread/pthread_attr_getstack.h"],
+    target_compatible_with = _PTHREAD_LINUX_ONLY,
+    deps = [
+        ":__support_common",
+        ":__support_macros_config",
+        ":__support_macros_optimization",
+        ":pthread_attr_getstacksize",
+    ],
+)
+
+libc_function(
+    name = "pthread_create",
+    srcs = ["src/pthread/pthread_create.cpp"],
+    hdrs = ["src/pthread/pthread_create.h"],
+    target_compatible_with = _PTHREAD_LINUX_ONLY,
+    deps = [
+        ":__support_common",
+        ":__support_libc_errno",
+        ":__support_macros_config",
+        ":__support_macros_optimization",
+        ":__support_threads_thread",
+        ":pthread_attr_destroy",
+        ":pthread_attr_getdetachstate",
+        ":pthread_attr_getguardsize",
+        ":pthread_attr_getstack",
+        ":pthread_attr_init",
+    ],
+)
+
+libc_function(
+    name = "pthread_join",
+    srcs = ["src/pthread/pthread_join.cpp"],
+    hdrs = ["src/pthread/pthread_join.h"],
+    target_compatible_with = _PTHREAD_LINUX_ONLY,
+    deps = [
+        ":__support_common",
+        ":__support_macros_config",
+        ":__support_threads_thread",
+    ],
+)
+
+libc_support_library(
+    name = "__support_threads_fork_callbacks",
+    srcs = ["src/__support/threads/fork_callbacks.cpp"],
+    hdrs = ["src/__support/threads/fork_callbacks.h"],
+    target_compatible_with = _PTHREAD_LINUX_ONLY,
+    deps = [
+        ":__support_cpp_mutex",
+        ":__support_macros_config",
+        ":__support_threads_mutex",
+    ],
+)
+
+libc_function(
+    name = "pthread_atfork",
+    srcs = ["src/pthread/pthread_atfork.cpp"],
+    hdrs = ["src/pthread/pthread_atfork.h"],
+    target_compatible_with = _PTHREAD_LINUX_ONLY,
+    deps = [
+        ":__support_common",
+        ":__support_libc_errno",
+        ":__support_macros_config",
+        ":__support_threads_fork_callbacks",
+    ],
+)
+
+libc_function(
+    name = "pthread_key_create",
+    srcs = ["src/pthread/pthread_key_create.cpp"],
+    hdrs = ["src/pthread/pthread_key_create.h"],
+    target_compatible_with = _PTHREAD_LINUX_ONLY,
+    deps = [
+        ":__support_common",
+        ":__support_libc_errno",
+        ":__support_macros_config",
+        ":__support_threads_thread",
+    ],
+)
+
+libc_function(
+    name = "pthread_once",
+    srcs = ["src/pthread/pthread_once.cpp"],
+    hdrs = ["src/pthread/pthread_once.h"],
+    target_compatible_with = _PTHREAD_LINUX_ONLY,
+    deps = [
+        ":__support_common",
+        ":__support_macros_config",
+        ":__support_threads_callonce",
+    ],
+)
+
+libc_function(
+    name = "pthread_setspecific",
+    srcs = ["src/pthread/pthread_setspecific.cpp"],
+    hdrs = ["src/pthread/pthread_setspecific.h"],
+    target_compatible_with = _PTHREAD_LINUX_ONLY,
+    deps = [
+        ":__support_common",
+        ":__support_libc_errno",
+        ":__support_macros_config",
+        ":__support_threads_thread",
+    ],
+)
+
 ############################### stdlib targets ###############################
 
 libc_function(
@@ -13562,6 +13762,7 @@ libc_function(
     deps = [
         ":__support_common",
         ":__support_macros_config",
+        ":__support_threads_thread",
         ":__support_osutil_exit",
         ":func_exit",
     ],
