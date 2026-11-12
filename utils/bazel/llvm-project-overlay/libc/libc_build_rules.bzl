@@ -65,20 +65,19 @@ def libc_release_copts():
     })
     return copts + platform_copts
 
-def _libc_library(name, deps = [], public_packaging = False, startup = False, **kwargs):
+def _libc_library(name, deps = [], copts = [], public_packaging = False, **kwargs):
     """Internal macro to serve as a base for all other libc library rules.
 
     Args:
       name: Target name.
       deps: Dependencies of the library.
+      copts: Compile options specific to this library.
       public_packaging: Export the C entrypoint in a full build.
-      startup: Disable stack protection for objects that run before TLS setup.
       **kwargs: All other attributes relevant for the cc_library rule.
     """
 
-    for attr in ["copts", "local_defines"]:
-        if attr in kwargs:
-            fail("disallowed attribute: '{}' in rule: '{}'".format(attr, name))
+    if "local_defines" in kwargs:
+        fail("disallowed attribute: 'local_defines' in rule: '{}'".format(name))
 
     full_build_deps = select({
         Label(":full_build"): [Label(":public_headers"), Label(":public_headers_deps")],
@@ -94,7 +93,7 @@ def _libc_library(name, deps = [], public_packaging = False, startup = False, **
 
     cc_library(
         name = name,
-        copts = libc_common_copts() + (["-fpie", "-fno-stack-protector", "-fno-addrsig"] if startup else []),
+        copts = libc_common_copts() + copts,
         deps = deps + full_build_deps,
         local_defines = LIBC_CONFIGURE_OPTIONS + public_defines,
         linkstatic = 1,
@@ -111,7 +110,8 @@ def libc_startup_library(name, target_compatible_with = [], **kwargs):
     """Build an object for the Linux process startup files."""
     _libc_library(
         name = name,
-        startup = True,
+        # Startup runs before the thread pointer and stack canary are initialized.
+        copts = ["-fpie", "-fno-stack-protector", "-fno-addrsig"],
         target_compatible_with = target_compatible_with + select({
             Label(":full_build_linux"): [],
             "//conditions:default": ["@platforms//:incompatible"],

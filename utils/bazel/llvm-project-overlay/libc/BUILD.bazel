@@ -1110,6 +1110,12 @@ libc_support_library(
 )
 
 libc_support_library(
+    name = "__support_cpp_mutex",
+    hdrs = ["src/__support/CPP/mutex.h"],
+    deps = [":__support_macros_config"],
+)
+
+libc_support_library(
     name = "__support_cpp_new",
     srcs = ["src/__support/CPP/new.cpp"],
     hdrs = ["src/__support/CPP/new.h"],
@@ -13490,6 +13496,65 @@ bit_prefix_needs_math_list = [
 ]
 
 ############################### stdlib targets ###############################
+
+libc_function(
+    name = "_Exit",
+    srcs = ["src/stdlib/_Exit.cpp"],
+    hdrs = ["src/stdlib/_Exit.h"],
+    target_compatible_with = select({
+        ":full_build_linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":__support_common",
+        ":__support_macros_config",
+        ":__support_osutil_exit",
+    ],
+)
+
+libc_support_library(
+    name = "stdlib_exit_handler",
+    hdrs = ["src/stdlib/exit_handler.h"],
+    deps = [
+        ":__support_blockstore",
+        ":__support_common",
+        ":__support_cpp_mutex",
+        ":__support_fixedvector",
+        ":__support_macros_config",
+        ":__support_threads_mutex",
+    ],
+)
+
+libc_function(
+    name = "atexit",
+    srcs = ["src/stdlib/atexit.cpp"],
+    copts = ["-std=gnu++20"],  # For constinit.
+    target_compatible_with = select({
+        ":full_build_linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":__support_common",
+        ":__support_macros_config",
+        ":func_atexit",
+        ":stdlib_exit_handler",
+    ],
+)
+
+libc_function(
+    name = "exit",
+    srcs = ["src/stdlib/exit.cpp"],
+    target_compatible_with = select({
+        ":full_build_linux": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        ":__support_common",
+        ":__support_macros_config",
+        ":__support_osutil_exit",
+        ":func_exit",
+    ],
+)
 
 libc_function(
     name = "abs",
