@@ -3412,8 +3412,18 @@ libc_support_library(
     ],
 )
 
-libc_support_library(
+alias(
     name = "errno",
+    actual = select({
+        # The full libc archive owns the errno implementation. Other archives
+        # use its declarations and resolve it through libc at final link.
+        ":full_build": ":__support_libc_errno",
+        "//conditions:default": ":errno_definition",
+    }),
+)
+
+libc_support_library(
+    name = "errno_definition",
     srcs = ["src/errno/libc_errno.cpp"],
     deps = [
         ":__support_common",
